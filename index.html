@@ -82,6 +82,17 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 .flash.go{animation:fl .22s ease-out}
 @keyframes fl{0%{opacity:.75}100%{opacity:0}}
+.modes{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 128px);display:flex;justify-content:center;gap:6px}
+.modes button{font-size:13px;font-weight:750;letter-spacing:.08em;padding:7px 14px;border-radius:999px;color:#ddd;background:rgba(0,0,0,.35)}
+.modes button.on{background:var(--accent);color:var(--accent-ink)}
+.shutter.vid i{background:#ff3b30}
+.shutter.rec i{transform:scale(.5);border-radius:8px;background:#ff3b30}
+.shutter.vid:active i{background:#ff3b30}
+.rectimer{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--safe-t) + 64px);background:rgba(0,0,0,.6);padding:6px 12px;border-radius:999px;font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:15px;display:flex;gap:8px;align-items:center}
+.rectimer i{width:10px;height:10px;border-radius:50%;background:#ff3b30;animation:pulse .8s infinite alternate}
+.cell .vbadge{position:absolute;left:5px;top:5px;display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.6);border-radius:5px;padding:2px 5px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.cell .vbadge svg{width:10px;height:10px}
+#vVid{max-width:100%;max-height:100%;background:#000}
 .camerr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;color:var(--muted)}
 .camerr strong{color:var(--fg);font-size:18px}
 .btn{height:48px;padding:0 20px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -130,8 +141,17 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
 .sheet .row{display:flex;gap:10px}
 .sheet .row .btn{flex:1}
 
+.sync{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:var(--panel);margin-bottom:14px;font-size:14px;text-align:left;width:100%}
+.sync i{width:10px;height:10px;border-radius:50%;flex:none;background:var(--muted)}
+.sync.ok i{background:var(--ok)} .sync.busy i{background:var(--accent);animation:pulse 1s infinite alternate} .sync.warn i{background:var(--accent)} .sync.err i{background:var(--danger)}
+.sync span{flex:1;min-width:0}
+.sync b{color:var(--accent);font-weight:650;flex:none}
+@keyframes pulse{to{opacity:.3}}
+select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:16px var(--font);padding:11px 12px;-webkit-appearance:none}
+.sheet .hint{font-size:13px}
+.drivelink{color:var(--accent);font-weight:600;text-decoration:none;text-align:center;padding:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 92px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
-@media (prefers-reduced-motion:reduce){.flash.go{animation:none}.shutter i{transition:none}}
+@media (prefers-reduced-motion:reduce){.rectimer i{animation:none}.sync.busy i{animation:none}.flash.go{animation:none}.shutter i{transition:none}}
 </style>
 </head>
 <body>
@@ -140,8 +160,10 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
 <section id="jobs" class="view">
   <header class="bar">
     <div class="brand"><div class="mark">GL</div><h1>Job Photos<small>GLugo Electric</small></h1></div>
+    <button class="iconbtn" id="setBtn" aria-label="Google Drive settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button>
   </header>
   <div class="scroll">
+    <button class="sync" id="sync" type="button"><i></i><span id="syncTxt">Checking backup…</span><b id="syncAct"></b></button>
     <div id="joblist" class="joblist"></div>
     <div id="jobsEmpty" class="empty" hidden>
       <strong>No jobs yet</strong>
@@ -169,10 +191,15 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
     <button class="chip on" id="stampBtn" aria-pressed="true">DATE STAMP</button>
     <button class="iconbtn" id="torchBtn" aria-label="Flashlight" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
   </div>
+  <div class="rectimer" id="recTimer" hidden><i></i><span id="recTime">0:00</span><span style="color:#aaa">/ 3:00</span></div>
+  <div class="modes" id="modes">
+    <button id="modePhoto" class="on" aria-pressed="true">PHOTO</button>
+    <button id="modeVideo" aria-pressed="false">VIDEO</button>
+  </div>
   <div class="cambottom">
     <button class="lastthumb" id="lastThumb" aria-label="Open job photos"><span class="n" id="camCount">0</span></button>
     <button class="shutter" id="shutter" aria-label="Take photo"><i></i></button>
-    <div class="camhint">Each tap saves. No confirm.</div>
+    <div class="camhint" id="camHint">Each tap saves. No confirm.</div>
   </div>
 </section>
 
@@ -184,19 +211,19 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
     <button class="txtbtn" id="selectBtn">Select</button>
   </header>
   <div class="scroll">
+    <button class="sync" id="galSync" type="button"><i></i><span id="galSyncTxt"></span><b id="galSyncAct"></b></button>
     <div class="actions">
-      <button class="btn" id="exportNewBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5"/></svg><span id="exportNewLbl">Save new to Drive</span></button>
-      <button class="btn ghost" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
+      <button class="btn" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
     </div>
     <div id="galGrid"></div>
     <div id="galEmpty" class="empty" hidden><strong>No photos yet</strong><span>Tap Take more to open the camera.</span></div>
-    <div class="legend" id="legend"><i></i> Already saved to Drive</div>
+    <div class="legend" id="legend"><i></i> Backed up to Google Drive</div>
     <div class="storage"><button class="txtbtn" id="editJobBtn" style="color:var(--muted)">Edit or delete job</button></div>
   </div>
   <div class="selbar" id="selBar" hidden>
     <span class="count" id="selCount">0 selected</span>
     <button class="btn ghost" id="selDelete">Delete</button>
-    <button class="btn" id="selShare">Save to Drive</button>
+    <button class="btn" id="selShare">Share</button>
   </div>
 </section>
 
@@ -208,6 +235,7 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
   </header>
   <div class="imgwrap">
     <img id="vImg" alt="Job photo">
+    <video id="vVid" controls playsinline hidden></video>
     <button class="navbtn prev" id="vPrev" aria-label="Previous photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="navbtn next" id="vNext" aria-label="Next photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
@@ -216,8 +244,9 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
     <textarea id="vNote" rows="2" placeholder="Add a note (e.g. main panel, before)"></textarea>
     <div class="vrow">
       <button class="btn ghost" id="vDelete">Delete</button>
-      <button class="btn" id="vShare">Save to Drive</button>
+      <button class="btn" id="vShare">Share</button>
     </div>
+    <a class="drivelink" id="vDrive" href="#" target="_blank" rel="noopener" hidden>Open in Google Drive</a>
   </div>
 </section>
 
@@ -232,6 +261,22 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
       <button type="submit" class="btn" id="jobSave">Start shooting</button>
     </div>
     <button type="button" class="btn danger" id="jobDelete" hidden>Delete job and all its photos</button>
+  </form>
+</div>
+
+<div class="scrim" id="setSheet" hidden>
+  <form class="sheet" id="setForm">
+    <h2>Google Drive backup</h2>
+    <p class="hint">Paste the Web app link and key from your Google Apps Script. Every photo uploads to the “GLugo Job Photos” folder in your Drive, one folder per job.</p>
+    <label>Web app link<input type="url" id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label>Key<input type="text" id="setKey" placeholder="glugo-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label>Keep photos on this phone<select id="setKeep"><option value="0">Always</option><option value="30">30 days after backup</option><option value="7">7 days after backup</option></select></label>
+    <p class="hint">Photos removed from the phone stay in Drive. The app keeps a small preview and a link to each one.</p>
+    <div class="row">
+      <button type="button" class="btn ghost" id="setTest">Test link</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+    <button type="button" class="btn ghost" id="setClose">Close</button>
   </form>
 </div>
 
@@ -253,20 +298,23 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const state = { job:null, photos:[], selecting:false, picked:new Set(), viewIdx:-1, stamp:true, urls:[] };
+const state = { mode:'photo', job:null, photos:[], selecting:false, picked:new Set(), viewIdx:-1, stamp:true, urls:[] };
 let db, stream=null, track=null, torchOn=false;
 
 try { state.stamp = localStorage.getItem('stamp') !== '0'; } catch(e) {}
+const cfg = { url:'', key:'', keep:0 };
+try { cfg.url=localStorage.getItem('gjp.url')||''; cfg.key=localStorage.getItem('gjp.key')||''; cfg.keep=Number(localStorage.getItem('gjp.keep')||0); } catch(e) {}
+const sync = { busy:false, err:'', left:0 };
 
 /* ---------- storage ---------- */
 function openDB(){
   return new Promise((res,rej)=>{
-    const r = indexedDB.open('glugo-job-photos',1);
+    const r = indexedDB.open('glugo-job-photos',2);
     r.onupgradeneeded = () => {
       const d = r.result;
-      d.createObjectStore('jobs',{keyPath:'id'});
-      const p = d.createObjectStore('photos',{keyPath:'id',autoIncrement:true});
-      p.createIndex('jobId','jobId');
+      if(!d.objectStoreNames.contains('jobs')) d.createObjectStore('jobs',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('photos')){ const p = d.createObjectStore('photos',{keyPath:'id',autoIncrement:true}); p.createIndex('jobId','jobId'); }
+      if(!d.objectStoreNames.contains('recparts')){ const c = d.createObjectStore('recparts',{keyPath:'id',autoIncrement:true}); c.createIndex('recId','recId'); }
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -305,10 +353,10 @@ function freeUrls(){ state.urls.forEach(u=>URL.revokeObjectURL(u)); state.urls=[
 const fmtDate = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const fmtTime = t => new Date(t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 const pad = n => String(n).padStart(2,'0');
-function fileName(job,p,i){
+function fileName(job,p){
   const d=new Date(p.taken);
   const slug=(job.name||'job').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'job';
-  return `${slug}_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${i+1}.jpg`;
+  return `${slug}_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${p.id}.${p.type==='video'?(String(p.mime).includes('webm')?'webm':'mp4'):'jpg'}`;
 }
 function confirmSheet(title,msg,yes='Delete'){
   return new Promise(res=>{
@@ -327,7 +375,7 @@ async function renderJobs(){
   $('jobsEmpty').hidden = jobs.length>0;
   for(const j of jobs){
     const [n,last,photos]=await Promise.all([countPhotos(j.id),latestPhoto(j.id),jobPhotos(j.id)]);
-    const unsaved=photos.filter(p=>!p.exported).length;
+    const unsaved=photos.filter(p=>!p.driveId).length;
     const b=document.createElement('button'); b.className='job';
     const th=document.createElement('div'); th.className='th';
     if(last) th.style.backgroundImage=`url(${url(last.thumb)})`;
@@ -336,8 +384,8 @@ async function renderJobs(){
     const nm=document.createElement('div'); nm.className='name'; nm.textContent=j.name;
     const sb=document.createElement('div'); sb.className='sub'; sb.textContent=(j.addr?j.addr+' · ':'')+fmtDate(j.updated);
     meta.append(nm,sb);
-    if(n){ const pl=document.createElement('span'); pl.className='pill'+(unsaved?'':' ok'); pl.textContent=unsaved?`${unsaved} not in Drive`:'All in Drive'; meta.append(pl); }
-    const ct=document.createElement('div'); ct.className='count'; ct.innerHTML=`<b>${n}</b>photos`;
+    if(n){ const pl=document.createElement('span'); pl.className='pill'+(unsaved?'':' ok'); pl.textContent=unsaved?`${unsaved} waiting for Drive`:'All in Drive'; meta.append(pl); }
+    const ct=document.createElement('div'); ct.className='count'; ct.innerHTML=`<b>${n}</b>files`;
     b.append(th,meta,ct);
     b.onclick=()=>openGallery(j);
     list.append(b);
@@ -377,8 +425,8 @@ $('jobForm').onsubmit=async e=>{
 $('jobDelete').onclick=async()=>{
   $('jobSheet').hidden=true;
   const n=state.photos.length;
-  const unsaved=state.photos.filter(p=>!p.exported).length;
-  const ok=await confirmSheet(`Delete “${state.job.name}”?`, `${n} photo${n===1?'':'s'} will be removed from this app.`+(unsaved?` ${unsaved} haven’t been saved to Drive yet.`:''),'Delete job');
+  const unsaved=state.photos.filter(p=>!p.driveId).length;
+  const ok=await confirmSheet(`Delete “${state.job.name}”?`, `${n} photo${n===1?'':'s'} will be removed from this app. Copies already in Google Drive stay there.`+(unsaved?` ${unsaved} haven’t uploaded yet and will be lost.`:''),'Delete job');
   if(!ok) return;
   await deletePhotos(state.photos.map(p=>p.id));
   await rq(store('jobs','readwrite').delete(state.job.id));
@@ -401,7 +449,16 @@ async function startCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camError('This browser can’t open the live camera. Open the app from your Home Screen in Safari.'); return; }
   try{
     stopCamera();
-    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:4032},height:{ideal:3024}}});
+    const vid = state.mode==='video'
+      ? {facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}
+      : {facingMode:{ideal:'environment'},width:{ideal:4032},height:{ideal:3024}};
+    if(state.mode==='video'){
+      try{ stream=await navigator.mediaDevices.getUserMedia({audio:true,video:vid}); }
+      catch(err){
+        if(err&&err.name==='NotAllowedError'){ stream=await navigator.mediaDevices.getUserMedia({audio:false,video:vid}); toast('Microphone is blocked, so videos will have no sound'); }
+        else throw err;
+      }
+    } else stream=await navigator.mediaDevices.getUserMedia({audio:false,video:vid});
     const v=$('video'); v.srcObject=stream; await v.play().catch(()=>{});
     track=stream.getVideoTracks()[0];
     const caps=track.getCapabilities?track.getCapabilities():{};
@@ -420,8 +477,97 @@ $('fileIn').onchange=async e=>{
   const c=$('cv'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0);
   URL.revokeObjectURL(img.src); await saveFromCanvas(c);
 };
-$('camBack').onclick=goJobs;
-$('lastThumb').onclick=()=>{ stopCamera(); openGallery(state.job); };
+$('camBack').onclick=async()=>{ await stopRecording(); goJobs(); };
+$('lastThumb').onclick=async()=>{ await stopRecording(); stopCamera(); openGallery(state.job); };
+
+/* ---------- video ---------- */
+const MAX_SEC=180;
+let rec=null, recId=null, recSeq=0, recStart=0, recTimerId=null, recWrites=[], recDone=null;
+function setMode(m){
+  if(rec||state.mode===m) return;
+  state.mode=m;
+  $('modePhoto').classList.toggle('on',m==='photo'); $('modePhoto').setAttribute('aria-pressed',m==='photo');
+  $('modeVideo').classList.toggle('on',m==='video'); $('modeVideo').setAttribute('aria-pressed',m==='video');
+  $('shutter').classList.toggle('vid',m==='video');
+  $('stampBtn').hidden=m==='video';
+  $('camHint').textContent=m==='video'?'Tap to start, tap to stop. Up to 3 min.':'Each tap saves. No confirm.';
+  $('shutter').setAttribute('aria-label',m==='video'?'Start recording':'Take photo');
+  startCamera();
+}
+$('modePhoto').onclick=()=>setMode('photo');
+$('modeVideo').onclick=()=>setMode('video');
+function pickMime(){
+  if(!window.MediaRecorder) return null;
+  for(const m of ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']){
+    try{ if(MediaRecorder.isTypeSupported(m)) return m; }catch(e){}
+  }
+  return '';
+}
+const fmtDur = sec => `${Math.floor(sec/60)}:${pad(Math.floor(sec%60))}`;
+async function grabThumb(){
+  const v=$('video'); const c=document.createElement('canvas');
+  const s=240/Math.min(v.videoWidth,v.videoHeight); c.width=Math.round(v.videoWidth*s); c.height=Math.round(v.videoHeight*s);
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  return blobOf(c,0.75);
+}
+async function startRecording(){
+  const v=$('video'); if(!stream||!v.videoWidth) return;
+  const mime=pickMime();
+  if(mime===null){ toast('Video recording needs iOS 14.3 or newer'); return; }
+  try{ rec=new MediaRecorder(stream, mime?{mimeType:mime,videoBitsPerSecond:3500000}:{videoBitsPerSecond:3500000}); }
+  catch(e){ try{ rec=new MediaRecorder(stream); }catch(e2){ toast('This phone can’t record video here'); rec=null; return; } }
+  recId='r'+Date.now().toString(36); recSeq=0; recStart=Date.now(); recWrites=[];
+  const type=(rec.mimeType||mime||'video/mp4').split(';')[0];
+  const thumb=await grabThumb();
+  // Save the recording's details first so it can be recovered if the app is closed mid-recording.
+  await rq(store('recparts','readwrite').add({recId,seq:-1,jobId:state.job.id,mime:type,started:recStart,thumb}));
+  rec.ondataavailable=e=>{
+    if(e.data&&e.data.size){ const seq=recSeq++; recWrites.push(rq(store('recparts','readwrite').add({recId,seq,blob:e.data})).catch(()=>{})); }
+  };
+  const myId=recId;
+  recDone=new Promise(res=>{ rec.onstop=async()=>{ await Promise.all(recWrites); await finishRecording(myId); res(); }; });
+  rec.start(1000);
+  $('shutter').classList.add('rec'); $('shutter').setAttribute('aria-label','Stop recording');
+  $('modes').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
+  recTimerId=setInterval(()=>{
+    const sec=(Date.now()-recStart)/1000; $('recTime').textContent=fmtDur(sec);
+    if(sec>=MAX_SEC){ toast('3-minute limit reached. Video saved.'); stopRecording(); }
+  },250);
+}
+async function stopRecording(){
+  if(!rec) return;
+  const r=rec, done=recDone; rec=null;
+  clearInterval(recTimerId);
+  $('shutter').classList.remove('rec'); $('shutter').setAttribute('aria-label','Start recording');
+  $('modes').hidden=false; $('recTimer').hidden=true;
+  try{ if(r.state!=='inactive'){ r.requestData&&r.requestData(); r.stop(); } }catch(e){}
+  await done;
+}
+// Put the saved pieces of a recording together into one video file.
+async function finishRecording(id){
+  const parts=(await rq(store('recparts').index('recId').getAll(id))).sort((a,b)=>a.seq-b.seq);
+  const meta=parts.find(x=>x.seq===-1); const pieces=parts.filter(x=>x.seq>=0).map(x=>x.blob);
+  if(meta&&pieces.length){
+    const blob=new Blob(pieces,{type:meta.mime});
+    const dur=Math.max(1,Math.round((Date.now()-meta.started)/1000));
+    const last=parts[parts.length-1];
+    await putPhoto({jobId:meta.jobId,type:'video',mime:meta.mime,blob,thumb:meta.thumb,taken:meta.started,duration:meta.recovered?null:dur,note:''});
+    const j=await rq(store('jobs').get(meta.jobId)); if(j){ j.updated=Date.now(); await putJob(j); }
+    if(state.job&&state.job.id===meta.jobId&&!$('camera').hidden){
+      $('lastThumb').style.backgroundImage=`url(${url(meta.thumb)})`;
+      $('camCount').textContent=Number($('camCount').textContent)+1;
+    }
+  }
+  await new Promise(res=>{ const t=db.transaction('recparts','readwrite'); parts.forEach(x=>t.objectStore('recparts').delete(x.id)); t.oncomplete=res; t.onerror=res; });
+  if(meta&&pieces.length){ toast(`Video saved (${fmtDur((Date.now()-meta.started)/1000)})`); runUploads(); }
+}
+// If the app was closed while recording, save whatever was captured.
+async function recoverRecordings(){
+  const all=await rq(store('recparts').getAll());
+  const ids=[...new Set(all.map(x=>x.recId))].filter(id=>id!==recId);
+  for(const id of ids){ const m=all.find(x=>x.recId===id&&x.seq===-1); if(m){ m.recovered=true; await rq(store('recparts','readwrite').put(m)); } await finishRecording(id); }
+  if(ids.length) toast('Recovered a video that was cut off');
+}
 $('torchBtn').onclick=async()=>{
   if(!track) return;
   try{ torchOn=!torchOn; await track.applyConstraints({advanced:[{torch:torchOn}]}); $('torchBtn').classList.toggle('on',torchOn); }
@@ -453,17 +599,19 @@ async function saveFromCanvas(c){
     state.job.updated=t; putJob(state.job);
     $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
     $('camCount').textContent=Number($('camCount').textContent)+1;
+    runUploads();
   }catch(e){ toast('Storage is full. Save photos to Drive and delete some.'); }
 }
 $('shutter').onclick=()=>{
+  if(state.mode==='video'){ if(rec) stopRecording(); else startRecording(); return; }
   const v=$('video'); if(!stream||!v.videoWidth) return;
   const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0,c.width,c.height);
   const f=$('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
   saveFromCanvas(c);
 };
-document.addEventListener('visibilitychange',()=>{
-  if(document.hidden) stopCamera();
+document.addEventListener('visibilitychange',async()=>{
+  if(document.hidden){ if(rec){ await stopRecording(); } stopCamera(); }
   else if(!$('camera').hidden) startCamera();
 });
 
@@ -478,17 +626,16 @@ function renderGallery(){
   const g=$('galGrid'); g.textContent='';
   const ps=state.photos;
   $('galEmpty').hidden=ps.length>0;
-  $('legend').hidden=!ps.some(p=>p.exported);
-  const unsaved=ps.filter(p=>!p.exported).length;
-  $('exportNewLbl').textContent = unsaved?`Save ${unsaved} new to Drive`:'All saved to Drive';
-  $('exportNewBtn').disabled=!unsaved; $('exportNewBtn').style.opacity=unsaved?1:.5;
+  $('legend').hidden=!ps.some(p=>p.driveId);
+  updSync();
   let day='', grid=null;
   ps.forEach((p,i)=>{
     const d=fmtDate(p.taken);
     if(d!==day){ day=d; const l=document.createElement('div'); l.className='daylabel'; l.textContent=d; g.append(l); grid=document.createElement('div'); grid.className='grid'; g.append(grid); }
     const c=document.createElement('button'); c.className='cell'+(state.picked.has(p.id)?' picked':'');
     c.style.backgroundImage=`url(${url(p.thumb)})`; c.setAttribute('aria-label','Photo '+fmtTime(p.taken));
-    if(p.exported) c.insertAdjacentHTML('beforeend','<span class="dot"></span>');
+    if(p.driveId) c.insertAdjacentHTML('beforeend','<span class="dot"></span>');
+    if(p.type==='video') c.insertAdjacentHTML('beforeend',`<span class="vbadge"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4l13 8-13 8z"/></svg>${p.duration?fmtDur(p.duration):'VIDEO'}</span>`);
     if(p.note) c.insertAdjacentHTML('beforeend','<span class="note"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg></span>');
     if(state.selecting) c.insertAdjacentHTML('beforeend','<span class="sel"></span>');
     c.onclick=()=>{
@@ -509,8 +656,9 @@ $('moreShotsBtn').onclick=()=>openCamera(state.job);
 $('editJobBtn').onclick=()=>openJobSheet(state.job);
 
 async function shareToDrive(list){
-  if(!list.length) return;
-  const files=list.map(p=>new File([p.blob],fileName(state.job,p,state.photos.indexOf(p)),{type:'image/jpeg'}));
+  list=list.filter(p=>p.blob);
+  if(!list.length){ toast('These photos are only in Google Drive now. Share them from Drive.'); return false; }
+  const files=list.map(p=>new File([p.blob],fileName(state.job,p),{type:p.type==='video'?p.mime:'image/jpeg'}));
   if(!navigator.share||!navigator.canShare||!navigator.canShare({files})){
     toast('Sharing isn’t available here. Open the app from your Home Screen in Safari.'); return false;
   }
@@ -520,19 +668,16 @@ async function shareToDrive(list){
     if(e&&e.name==='AbortError') return false;
     toast('Couldn’t open the share sheet. Try fewer photos at a time.'); return false;
   }
-  for(const p of list){ p.exported=true; await putPhoto(p); }
-  toast(`${list.length} photo${list.length===1?'':'s'} marked as saved`);
   return true;
 }
-$('exportNewBtn').onclick=async()=>{ if(await shareToDrive(state.photos.filter(p=>!p.exported))) renderGallery(); };
 $('selShare').onclick=async()=>{
   const list=state.photos.filter(p=>state.picked.has(p.id));
   if(await shareToDrive(list)){ exitSelect(); renderGallery(); }
 };
 $('selDelete').onclick=async()=>{
   const list=state.photos.filter(p=>state.picked.has(p.id));
-  const unsaved=list.filter(p=>!p.exported).length;
-  const ok=await confirmSheet(`Delete ${list.length} photo${list.length===1?'':'s'}?`, unsaved?`${unsaved} of these haven’t been saved to Drive yet.`:'They’re already saved to Drive.');
+  const unsaved=list.filter(p=>!p.driveId).length;
+  const ok=await confirmSheet(`Delete ${list.length} photo${list.length===1?'':'s'}?`, unsaved?`${unsaved} of these haven’t uploaded to Drive yet and will be lost.`:'They’ll be removed from this app. The copies in Google Drive stay there.');
   if(!ok) return;
   await deletePhotos(list.map(p=>p.id));
   state.photos=state.photos.filter(p=>!state.picked.has(p.id));
@@ -544,11 +689,16 @@ let vUrl=null;
 function openViewer(i){
   state.viewIdx=i; const p=state.photos[i];
   if(vUrl) URL.revokeObjectURL(vUrl);
-  vUrl=URL.createObjectURL(p.blob); $('vImg').src=vUrl;
+  const isVid=p.type==='video'&&p.blob;
+  vUrl=URL.createObjectURL(p.blob||p.thumb);
+  $('vVid').pause(); $('vVid').removeAttribute('src'); $('vVid').hidden=!isVid; $('vImg').hidden=!!isVid;
+  if(isVid) $('vVid').src=vUrl; else $('vImg').src=vUrl;
   $('vTitle').textContent=`${i+1} of ${state.photos.length}`;
   $('vDate').textContent=`${fmtDate(p.taken)} · ${fmtTime(p.taken)}`;
-  $('vStatus').textContent=p.exported?'Saved to Drive':'Not in Drive yet';
-  $('vStatus').style.color=p.exported?'var(--ok)':'var(--accent)';
+  $('vStatus').textContent=p.driveId?(p.blob?'In Google Drive':'In Google Drive only'):'Waiting to upload';
+  $('vStatus').style.color=p.driveId?'var(--ok)':'var(--accent)';
+  $('vDrive').hidden=!p.driveId; if(p.driveId) $('vDrive').href=`https://drive.google.com/file/d/${p.driveId}/view`;
+  $('vShare').hidden=!p.blob;
   $('vNote').value=p.note||'';
   $('vPrev').hidden=i===0; $('vNext').hidden=i===state.photos.length-1;
   $('viewer').hidden=false;
@@ -558,7 +708,7 @@ async function saveNote(){
   const v=$('vNote').value.trim(); if(v===(p.note||'')) return;
   p.note=v; await putPhoto(p);
 }
-async function closeViewer(){ await saveNote(); $('viewer').hidden=true; if(vUrl){URL.revokeObjectURL(vUrl);vUrl=null;} renderGallery(); }
+async function closeViewer(){ $('vVid').pause(); await saveNote(); $('viewer').hidden=true; if(vUrl){URL.revokeObjectURL(vUrl);vUrl=null;} renderGallery(); }
 $('vClose').onclick=closeViewer;
 $('vNote').onblur=saveNote;
 $('vPrev').onclick=async()=>{ await saveNote(); openViewer(state.viewIdx-1); };
@@ -574,19 +724,146 @@ $('vImg').addEventListener('touchend',async e=>{
 $('vShare').onclick=async()=>{ const ok=await shareToDrive([state.photos[state.viewIdx]]); await saveNote(); if(ok) openViewer(state.viewIdx); };
 $('vDelete').onclick=async()=>{
   const p=state.photos[state.viewIdx];
-  const ok=await confirmSheet('Delete this photo?', p.exported?'It’s already saved to Drive.':'It hasn’t been saved to Drive yet.');
+  const ok=await confirmSheet('Delete this photo?', p.driveId?'It’s removed from this app. The copy in Google Drive stays there.':'It hasn’t uploaded to Drive yet and will be lost.');
   if(!ok) return;
   await deletePhotos([p.id]); state.photos.splice(state.viewIdx,1);
   if(!state.photos.length){ closeViewer(); return; }
   openViewer(Math.min(state.viewIdx,state.photos.length-1));
 };
 
+/* ---------- Google Drive backup ---------- */
+function folderName(job){
+  if(!job.folder){ job.folder=(job.name+(job.addr?' – '+job.addr:'')).replace(/[\/\\]/g,'-').trim().slice(0,100); putJob(job); }
+  return job.folder;
+}
+function b64(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(blob); });
+}
+async function callDrive(body,timeout=120000){
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),timeout);
+  let r;
+  try{ r=await fetch(cfg.url,{method:'POST',body:JSON.stringify(Object.assign({key:cfg.key},body)),signal:ctrl.signal}); }
+  catch(e){ throw new Error(navigator.onLine?'Couldn’t reach Google. Will retry.':'No signal. Will upload when you’re back online.'); }
+  finally{ clearTimeout(t); }
+  let j; try{ j=JSON.parse(await r.text()); }catch(e){ throw new Error('The Web app link isn’t answering. Check it in Settings.'); }
+  if(!j.ok) throw new Error(j.error==='bad key'?'The key doesn’t match your script. Check Settings.':'Drive said: '+j.error);
+  return j;
+}
+const BIG=6*1024*1024, CHUNK=4*1024*1024;
+// Big files (videos) go up in 4 MB pieces. If the signal drops, the next try continues from the last piece Google confirmed.
+async function uploadBig(p,job){
+  const total=p.blob.size, mime=p.type==='video'?p.mime:'image/jpeg';
+  if(p.up){
+    const st=await callDrive({action:'status',session:p.up.session,total});
+    if(st.id) return st;
+    if(st.expired){ p.up=null; await putPhoto(p); return uploadBig(p,job); }
+    p.up.offset=st.next;
+  } else {
+    const r=await callDrive({action:'start',folder:folderName(job),name:fileName(job,p),note:p.note||'',mime,size:total});
+    if(r.id) return r;
+    p.up={session:r.session,offset:0}; await putPhoto(p);
+  }
+  while(true){
+    sync.pct=Math.round(p.up.offset/total*100); updSync();
+    const end=Math.min(p.up.offset+CHUNK,total);
+    const r=await callDrive({action:'chunk',session:p.up.session,start:p.up.offset,total,mime,data:await b64(p.blob.slice(p.up.offset,end))});
+    if(r.id){ sync.pct=null; delete p.up; return r; }
+    p.up.offset=r.next; await putPhoto(p);
+  }
+}
+function pendingList(){
+  return new Promise(res=>{
+    const out=[]; const r=store('photos').openCursor();
+    r.onsuccess=()=>{ const c=r.result; if(!c){ res(out.sort((a,b)=>a.taken-b.taken)); return; } const v=c.value; if(!v.driveId&&v.blob) out.push(v); c.continue(); };
+    r.onerror=()=>res(out);
+  });
+}
+async function runUploads(){
+  if(sync.busy||!db) return;
+  if(!cfg.url||!cfg.key){ updSync(); return; }
+  sync.busy=true; let did=0;
+  try{
+    const jobs=new Map((await allJobs()).map(j=>[j.id,j]));
+    let list=await pendingList();
+    while(list.length){
+      sync.left=list.length; sync.err=''; updSync();
+      const p=list[0], job=jobs.get(p.jobId);
+      if(job){
+        const res=(p.type==='video'||p.blob.size>BIG)?await uploadBig(p,job):await callDrive({action:'upload',folder:folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(p.blob)});
+        p.driveId=res.id; await putPhoto(p); did++;
+        const g=state.photos.find(x=>x.id===p.id); if(g){ g.driveId=res.id; if(!$('gallery').hidden&&$('viewer').hidden) renderGallery(); }
+      }
+      list=await pendingList();
+    }
+    sync.err=''; sync.left=0;
+    await prune();
+  }catch(e){ sync.err=e.message; sync.pct=null; sync.left=(await pendingList()).length; }
+  finally{ sync.busy=false; updSync(); if(did&&!$('jobs').hidden) renderJobs(); }
+}
+async function prune(){
+  if(!cfg.keep) return;
+  const cutoff=Date.now()-cfg.keep*86400000;
+  const all=await rq(store('photos').getAll());
+  for(const p of all){ if(p.driveId&&p.blob&&p.taken<cutoff){ p.blob=null; await putPhoto(p); } }
+}
+async function updSync(){
+  const set=(el,cls,txt,act)=>{ $(el).className='sync '+cls; $(el+'Txt').textContent=txt; $(el+'Act').textContent=act||''; };
+  let cls,txt,act='';
+  if(!cfg.url||!cfg.key){ cls='warn'; txt='Auto backup is off. Photos are only on this phone.'; act='Set up'; }
+  else {
+    const left=sync.busy?sync.left:(db?(await pendingList()).length:0);
+    if(sync.busy&&left){ cls='busy'; txt=`Uploading to Google Drive… ${left} left`+(sync.pct!=null?` (video ${sync.pct}%)`:''); }
+    else if(sync.err&&left){ cls=navigator.onLine?'err':'warn'; txt=`${left} waiting. ${sync.err}`; act='Retry'; }
+    else if(left){ cls='warn'; txt=`${left} waiting to upload`; act='Upload'; }
+    else { cls='ok'; txt='All photos backed up to Google Drive'; }
+  }
+  set('sync',cls,txt,act);
+  if(state.job){
+    const ps=state.photos, inDrive=ps.filter(p=>p.driveId).length;
+    let gt=txt;
+    if(cfg.url&&cfg.key&&ps.length) gt=`${inDrive} of ${ps.length} in Google Drive`+(cls==='busy'?' · uploading…':cls==='err'||cls==='warn'?' · '+txt:'');
+    set('galSync',cls==='ok'&&inDrive<ps.length?'warn':cls,gt,act);
+  }
+}
+function syncTap(){ if(!cfg.url||!cfg.key) openSettings(); else { sync.err=''; runUploads(); } }
+$('sync').onclick=syncTap; $('galSync').onclick=syncTap;
+
+function openSettings(){
+  $('setUrl').value=cfg.url; $('setKey').value=cfg.key; $('setKeep').value=String(cfg.keep);
+  $('setSheet').hidden=false;
+}
+$('setBtn').onclick=openSettings;
+$('setClose').onclick=()=>$('setSheet').hidden=true;
+function readSettings(){ return { url:$('setUrl').value.trim(), key:$('setKey').value.trim(), keep:Number($('setKeep').value) }; }
+$('setTest').onclick=async()=>{
+  const s=readSettings();
+  if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(s.url)){ toast('The link should start with https://script.google.com and end with /exec'); return; }
+  const old={...cfg}; Object.assign(cfg,s);
+  toast('Testing…');
+  try{ await callDrive({action:'ping'},20000); toast('Connected to Google Drive'); }
+  catch(e){ toast(e.message); }
+  finally{ Object.assign(cfg,old); }
+};
+$('setForm').onsubmit=e=>{
+  e.preventDefault();
+  const s=readSettings();
+  if(s.url&&!/^https:\/\/script\.google\.com\/.+\/exec/.test(s.url)){ toast('The link should start with https://script.google.com and end with /exec'); return; }
+  Object.assign(cfg,s);
+  try{ localStorage.setItem('gjp.url',cfg.url); localStorage.setItem('gjp.key',cfg.key); localStorage.setItem('gjp.keep',String(cfg.keep)); }catch(e){}
+  $('setSheet').hidden=true; toast(cfg.url?'Saved. Uploading now.':'Saved');
+  sync.err=''; runUploads();
+};
+window.addEventListener('online',()=>{ sync.err=''; runUploads(); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) runUploads(); });
+setInterval(runUploads,30000);
+
 /* ---------- boot ---------- */
 (async()=>{
   try{
     db=await openDB();
     if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-    renderJobs();
+    await recoverRecordings().catch(()=>{});
+    renderJobs(); runUploads();
   }catch(e){
     $('jobsEmpty').hidden=false;
     $('jobsEmpty').innerHTML='<strong>Storage is blocked</strong><span>Turn off Private Browsing in Safari and open the app again.</span>';
