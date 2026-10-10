@@ -309,12 +309,13 @@ const sync = { busy:false, err:'', left:0 };
 /* ---------- storage ---------- */
 function openDB(){
   return new Promise((res,rej)=>{
-    const r = indexedDB.open('glugo-job-photos',2);
+    const r = indexedDB.open('glugo-job-photos',3);
     r.onupgradeneeded = () => {
       const d = r.result;
       if(!d.objectStoreNames.contains('jobs')) d.createObjectStore('jobs',{keyPath:'id'});
       if(!d.objectStoreNames.contains('photos')){ const p = d.createObjectStore('photos',{keyPath:'id',autoIncrement:true}); p.createIndex('jobId','jobId'); }
       if(!d.objectStoreNames.contains('recparts')){ const c = d.createObjectStore('recparts',{keyPath:'id',autoIncrement:true}); c.createIndex('recId','recId'); }
+      if(!d.objectStoreNames.contains('media')) d.createObjectStore('media',{keyPath:'id'});
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -333,13 +334,53 @@ function latestPhoto(id){
     r.onerror = () => res(null);
   });
 }
+// Photo/video records hold only small details. The file itself is stored once, as raw bytes,
+// in the 'media' store. (Safari has a bug when saving Blob objects again after reading them back.)
 const putPhoto = p => rq(store('photos','readwrite').put(p));
 function deletePhotos(ids){
   return new Promise((res,rej)=>{
-    const t = db.transaction('photos','readwrite');
-    ids.forEach(id=>t.objectStore('photos').delete(id));
+    const t = db.transaction(['photos','media'],'readwrite');
+    ids.forEach(id=>{ t.objectStore('photos').delete(id); t.objectStore('media').delete(id); });
     t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
   });
+}
+function addItem(meta,buf){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(['photos','media'],'readwrite');
+    Object.assign(meta,{hasMedia:true,size:buf.byteLength});
+    const r=t.objectStore('photos').add(meta);
+    r.onsuccess=()=>{ meta.id=r.result; t.objectStore('media').put({id:r.result,buf,mime:meta.mime}); };
+    t.oncomplete=()=>res(meta); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('Save cancelled'));
+  });
+}
+async function getMedia(p){
+  if(!p.hasMedia) return null;
+  const m=await rq(store('media').get(p.id));
+  return m?new Blob([m.buf],{type:m.mime||p.mime||'image/jpeg'}):null;
+}
+function dropMedia(p){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(['photos','media'],'readwrite');
+    t.objectStore('media').delete(p.id); p.hasMedia=false; t.objectStore('photos').put(p);
+    t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+  });
+}
+const thumbUrl = p => p&&p.thumbBuf ? url(new Blob([p.thumbBuf],{type:'image/jpeg'})) : '';
+const bufOf = b => b.arrayBuffer ? b.arrayBuffer() : new Response(b).arrayBuffer();
+// Move files saved by the earlier version of the app into the new storage.
+async function migrate(){
+  const all=await rq(store('photos').getAll());
+  for(const p of all){
+    if(!('blob' in p)&&!('thumb' in p)) continue;
+    try{ if(p.thumb) p.thumbBuf=await bufOf(p.thumb); }catch(e){}
+    p.mime=p.mime||'image/jpeg';
+    try{
+      if(p.blob){ const buf=await bufOf(p.blob); await rq(store('media','readwrite').put({id:p.id,buf,mime:p.mime})); p.hasMedia=true; p.size=buf.byteLength; }
+      else p.hasMedia=false;
+    }catch(e){ p.hasMedia=false; if(!p.driveId) p.broken=true; }
+    delete p.blob; delete p.thumb; delete p.up; delete p.exported;
+    await putPhoto(p);
+  }
 }
 
 /* ---------- helpers ---------- */
@@ -358,9 +399,10 @@ function fileName(job,p){
   const slug=(job.name||'job').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'job';
   return `${slug}_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${p.id}.${p.type==='video'?(String(p.mime).includes('webm')?'webm':'mp4'):'jpg'}`;
 }
-function confirmSheet(title,msg,yes='Delete'){
+function confirmSheet(title,msg,yes='Delete',safe=false){
   return new Promise(res=>{
     $('cTitle').textContent=title; $('cMsg').textContent=msg; $('cYes').textContent=yes;
+    $('cYes').className=safe?'btn':'btn danger';
     $('confirmSheet').hidden=false;
     const done=v=>{ $('confirmSheet').hidden=true; $('cYes').onclick=$('cNo').onclick=null; res(v); };
     $('cYes').onclick=()=>done(true); $('cNo').onclick=()=>done(false);
@@ -375,10 +417,10 @@ async function renderJobs(){
   $('jobsEmpty').hidden = jobs.length>0;
   for(const j of jobs){
     const [n,last,photos]=await Promise.all([countPhotos(j.id),latestPhoto(j.id),jobPhotos(j.id)]);
-    const unsaved=photos.filter(p=>!p.driveId).length;
+    const unsaved=photos.filter(p=>!p.driveId&&!p.broken).length;
     const b=document.createElement('button'); b.className='job';
     const th=document.createElement('div'); th.className='th';
-    if(last) th.style.backgroundImage=`url(${url(last.thumb)})`;
+    if(last&&last.thumbBuf) th.style.backgroundImage=`url(${thumbUrl(last)})`;
     else th.innerHTML='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
     const meta=document.createElement('div'); meta.className='meta';
     const nm=document.createElement('div'); nm.className='name'; nm.textContent=j.name;
@@ -439,7 +481,7 @@ async function openCamera(job){
   state.job=job; freeUrls();
   $('camJob').textContent=job.name;
   const last=await latestPhoto(job.id);
-  $('lastThumb').style.backgroundImage = last?`url(${url(last.thumb)})`:'none';
+  $('lastThumb').style.backgroundImage = last&&last.thumbBuf?`url(${thumbUrl(last)})`:'none';
   $('camCount').textContent=await countPhotos(job.id);
   updStamp();
   show('camera'); startCamera();
@@ -518,11 +560,12 @@ async function startRecording(){
   catch(e){ try{ rec=new MediaRecorder(stream); }catch(e2){ toast('This phone can’t record video here'); rec=null; return; } }
   recId='r'+Date.now().toString(36); recSeq=0; recStart=Date.now(); recWrites=[];
   const type=(rec.mimeType||mime||'video/mp4').split(';')[0];
-  const thumb=await grabThumb();
+  const tb=await grabThumb(); const thumbBuf=tb?await bufOf(tb):null;
   // Save the recording's details first so it can be recovered if the app is closed mid-recording.
-  await rq(store('recparts','readwrite').add({recId,seq:-1,jobId:state.job.id,mime:type,started:recStart,thumb}));
+  await rq(store('recparts','readwrite').add({recId,seq:-1,jobId:state.job.id,mime:type,started:recStart,thumbBuf}));
+  const myRec=recId;
   rec.ondataavailable=e=>{
-    if(e.data&&e.data.size){ const seq=recSeq++; recWrites.push(rq(store('recparts','readwrite').add({recId,seq,blob:e.data})).catch(()=>{})); }
+    if(e.data&&e.data.size){ const seq=recSeq++; recWrites.push(bufOf(e.data).then(buf=>rq(store('recparts','readwrite').add({recId:myRec,seq,buf}))).catch(()=>{})); }
   };
   const myId=recId;
   recDone=new Promise(res=>{ rec.onstop=async()=>{ await Promise.all(recWrites); await finishRecording(myId); res(); }; });
@@ -546,15 +589,14 @@ async function stopRecording(){
 // Put the saved pieces of a recording together into one video file.
 async function finishRecording(id){
   const parts=(await rq(store('recparts').index('recId').getAll(id))).sort((a,b)=>a.seq-b.seq);
-  const meta=parts.find(x=>x.seq===-1); const pieces=parts.filter(x=>x.seq>=0).map(x=>x.blob);
+  const meta=parts.find(x=>x.seq===-1); const pieces=parts.filter(x=>x.seq>=0).map(x=>x.buf||x.blob).filter(Boolean);
   if(meta&&pieces.length){
-    const blob=new Blob(pieces,{type:meta.mime});
+    const buf=await bufOf(new Blob(pieces,{type:meta.mime}));
     const dur=Math.max(1,Math.round((Date.now()-meta.started)/1000));
-    const last=parts[parts.length-1];
-    await putPhoto({jobId:meta.jobId,type:'video',mime:meta.mime,blob,thumb:meta.thumb,taken:meta.started,duration:meta.recovered?null:dur,note:''});
+    await addItem({jobId:meta.jobId,type:'video',mime:meta.mime,thumbBuf:meta.thumbBuf||null,taken:meta.started,duration:meta.recovered?null:dur,note:''},buf);
     const j=await rq(store('jobs').get(meta.jobId)); if(j){ j.updated=Date.now(); await putJob(j); }
     if(state.job&&state.job.id===meta.jobId&&!$('camera').hidden){
-      $('lastThumb').style.backgroundImage=`url(${url(meta.thumb)})`;
+      if(meta.thumbBuf) $('lastThumb').style.backgroundImage=`url(${url(new Blob([meta.thumbBuf],{type:'image/jpeg'}))})`;
       $('camCount').textContent=Number($('camCount').textContent)+1;
     }
   }
@@ -595,9 +637,10 @@ async function saveFromCanvas(c){
   const [blob,thumb]=await Promise.all([blobOf(c,0.92),blobOf(tc,0.75)]);
   if(!blob){ toast('Photo didn’t save. Try again.'); return; }
   try{
-    await putPhoto({jobId:state.job.id,blob,thumb,taken:t,note:'',exported:false});
+    const [buf,thumbBuf]=await Promise.all([bufOf(blob),thumb?bufOf(thumb):null]);
+    await addItem({jobId:state.job.id,type:'photo',mime:'image/jpeg',thumbBuf,taken:t,note:''},buf);
     state.job.updated=t; putJob(state.job);
-    $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
+    if(thumb) $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
     $('camCount').textContent=Number($('camCount').textContent)+1;
     runUploads();
   }catch(e){ toast('Storage is full. Save photos to Drive and delete some.'); }
@@ -633,9 +676,10 @@ function renderGallery(){
     const d=fmtDate(p.taken);
     if(d!==day){ day=d; const l=document.createElement('div'); l.className='daylabel'; l.textContent=d; g.append(l); grid=document.createElement('div'); grid.className='grid'; g.append(grid); }
     const c=document.createElement('button'); c.className='cell'+(state.picked.has(p.id)?' picked':'');
-    c.style.backgroundImage=`url(${url(p.thumb)})`; c.setAttribute('aria-label','Photo '+fmtTime(p.taken));
+    if(p.thumbBuf) c.style.backgroundImage=`url(${thumbUrl(p)})`; c.setAttribute('aria-label','Photo '+fmtTime(p.taken));
     if(p.driveId) c.insertAdjacentHTML('beforeend','<span class="dot"></span>');
     if(p.type==='video') c.insertAdjacentHTML('beforeend',`<span class="vbadge"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4l13 8-13 8z"/></svg>${p.duration?fmtDur(p.duration):'VIDEO'}</span>`);
+    if(p.broken) c.insertAdjacentHTML('beforeend','<span class="vbadge" style="background:var(--danger)">CAN’T READ</span>');
     if(p.note) c.insertAdjacentHTML('beforeend','<span class="note"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg></span>');
     if(state.selecting) c.insertAdjacentHTML('beforeend','<span class="sel"></span>');
     c.onclick=()=>{
@@ -656,12 +700,16 @@ $('moreShotsBtn').onclick=()=>openCamera(state.job);
 $('editJobBtn').onclick=()=>openJobSheet(state.job);
 
 async function shareToDrive(list){
-  list=list.filter(p=>p.blob);
-  if(!list.length){ toast('These photos are only in Google Drive now. Share them from Drive.'); return false; }
-  const files=list.map(p=>new File([p.blob],fileName(state.job,p),{type:p.type==='video'?p.mime:'image/jpeg'}));
+  list=list.filter(p=>p.hasMedia);
+  if(!list.length){ toast('These are only in Google Drive now. Share them from Drive.'); return false; }
+  const files=[];
+  for(const p of list){ const b=await getMedia(p); if(b) files.push(new File([b],fileName(state.job,p),{type:b.type})); }
+  if(!files.length){ toast('Couldn’t read these files.'); return false; }
   if(!navigator.share||!navigator.canShare||!navigator.canShare({files})){
     toast('Sharing isn’t available here. Open the app from your Home Screen in Safari.'); return false;
   }
+  const go=await confirmSheet(`Share ${files.length} file${files.length===1?'':'s'}`,'Pick where to send them: Messages, Mail, Files and more.','Share',true);
+  if(!go) return false;
   try{
     await navigator.share({files});
   }catch(e){
@@ -686,19 +734,22 @@ $('selDelete').onclick=async()=>{
 
 /* ---------- viewer ---------- */
 let vUrl=null;
-function openViewer(i){
+async function openViewer(i){
   state.viewIdx=i; const p=state.photos[i];
-  if(vUrl) URL.revokeObjectURL(vUrl);
-  const isVid=p.type==='video'&&p.blob;
-  vUrl=URL.createObjectURL(p.blob||p.thumb);
+  if(vUrl){ URL.revokeObjectURL(vUrl); vUrl=null; }
+  const file=await getMedia(p).catch(()=>null);
+  if(state.viewIdx!==i) return;
+  const isVid=p.type==='video'&&file;
+  const show=file||(p.thumbBuf?new Blob([p.thumbBuf],{type:'image/jpeg'}):null);
+  vUrl=show?URL.createObjectURL(show):null;
   $('vVid').pause(); $('vVid').removeAttribute('src'); $('vVid').hidden=!isVid; $('vImg').hidden=!!isVid;
-  if(isVid) $('vVid').src=vUrl; else $('vImg').src=vUrl;
+  if(isVid) $('vVid').src=vUrl; else if(vUrl) $('vImg').src=vUrl; else $('vImg').removeAttribute('src');
   $('vTitle').textContent=`${i+1} of ${state.photos.length}`;
   $('vDate').textContent=`${fmtDate(p.taken)} · ${fmtTime(p.taken)}`;
-  $('vStatus').textContent=p.driveId?(p.blob?'In Google Drive':'In Google Drive only'):'Waiting to upload';
-  $('vStatus').style.color=p.driveId?'var(--ok)':'var(--accent)';
+  $('vStatus').textContent=p.broken?'This file couldn’t be read':p.driveId?(p.hasMedia?'In Google Drive':'In Google Drive only'):'Waiting to upload';
+  $('vStatus').style.color=p.broken?'var(--danger)':p.driveId?'var(--ok)':'var(--accent)';
   $('vDrive').hidden=!p.driveId; if(p.driveId) $('vDrive').href=`https://drive.google.com/file/d/${p.driveId}/view`;
-  $('vShare').hidden=!p.blob;
+  $('vShare').hidden=!p.hasMedia;
   $('vNote').value=p.note||'';
   $('vPrev').hidden=i===0; $('vNext').hidden=i===state.photos.length-1;
   $('viewer').hidden=false;
@@ -751,12 +802,12 @@ async function callDrive(body,timeout=120000){
 }
 const BIG=6*1024*1024, CHUNK=4*1024*1024;
 // Big files (videos) go up in 4 MB pieces. If the signal drops, the next try continues from the last piece Google confirmed.
-async function uploadBig(p,job){
-  const total=p.blob.size, mime=p.type==='video'?p.mime:'image/jpeg';
+async function uploadBig(p,job,file){
+  const total=file.size, mime=file.type||p.mime||'video/mp4';
   if(p.up){
     const st=await callDrive({action:'status',session:p.up.session,total});
     if(st.id) return st;
-    if(st.expired){ p.up=null; await putPhoto(p); return uploadBig(p,job); }
+    if(st.expired){ p.up=null; await putPhoto(p); return uploadBig(p,job,file); }
     p.up.offset=st.next;
   } else {
     const r=await callDrive({action:'start',folder:folderName(job),name:fileName(job,p),note:p.note||'',mime,size:total});
@@ -766,7 +817,7 @@ async function uploadBig(p,job){
   while(true){
     sync.pct=Math.round(p.up.offset/total*100); updSync();
     const end=Math.min(p.up.offset+CHUNK,total);
-    const r=await callDrive({action:'chunk',session:p.up.session,start:p.up.offset,total,mime,data:await b64(p.blob.slice(p.up.offset,end))});
+    const r=await callDrive({action:'chunk',session:p.up.session,start:p.up.offset,total,mime,data:await b64(file.slice(p.up.offset,end))});
     if(r.id){ sync.pct=null; delete p.up; return r; }
     p.up.offset=r.next; await putPhoto(p);
   }
@@ -774,7 +825,7 @@ async function uploadBig(p,job){
 function pendingList(){
   return new Promise(res=>{
     const out=[]; const r=store('photos').openCursor();
-    r.onsuccess=()=>{ const c=r.result; if(!c){ res(out.sort((a,b)=>a.taken-b.taken)); return; } const v=c.value; if(!v.driveId&&v.blob) out.push(v); c.continue(); };
+    r.onsuccess=()=>{ const c=r.result; if(!c){ res(out.sort((a,b)=>a.taken-b.taken)); return; } const v=c.value; if(!v.driveId&&v.hasMedia&&!v.broken) out.push(v); c.continue(); };
     r.onerror=()=>res(out);
   });
 }
@@ -789,7 +840,10 @@ async function runUploads(){
       sync.left=list.length; sync.err=''; updSync();
       const p=list[0], job=jobs.get(p.jobId);
       if(job){
-        const res=(p.type==='video'||p.blob.size>BIG)?await uploadBig(p,job):await callDrive({action:'upload',folder:folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(p.blob)});
+        let file;
+        try{ file=await getMedia(p); }catch(e){ file=null; }
+        if(!file){ p.broken=true; await putPhoto(p); list=await pendingList(); continue; }
+        const res=(p.type==='video'||file.size>BIG)?await uploadBig(p,job,file):await callDrive({action:'upload',folder:folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(file)});
         p.driveId=res.id; await putPhoto(p); did++;
         const g=state.photos.find(x=>x.id===p.id); if(g){ g.driveId=res.id; if(!$('gallery').hidden&&$('viewer').hidden) renderGallery(); }
       }
@@ -804,7 +858,7 @@ async function prune(){
   if(!cfg.keep) return;
   const cutoff=Date.now()-cfg.keep*86400000;
   const all=await rq(store('photos').getAll());
-  for(const p of all){ if(p.driveId&&p.blob&&p.taken<cutoff){ p.blob=null; await putPhoto(p); } }
+  for(const p of all){ if(p.driveId&&p.hasMedia&&p.taken<cutoff) await dropMedia(p); }
 }
 async function updSync(){
   const set=(el,cls,txt,act)=>{ $(el).className='sync '+cls; $(el+'Txt').textContent=txt; $(el+'Act').textContent=act||''; };
@@ -862,6 +916,7 @@ setInterval(runUploads,30000);
   try{
     db=await openDB();
     if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    await migrate().catch(()=>{});
     await recoverRecordings().catch(()=>{});
     renderJobs(); runUploads();
   }catch(e){
