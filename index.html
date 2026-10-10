@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GLugo Job Photos</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Job Photos">
+<meta name="theme-color" content="#121214">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* Layout: one-screen app, three views (Jobs → Camera → Job gallery). Dark shop look with GLugo yellow. */
+:root{
+  --bg:#121214; --panel:#1c1d21; --panel2:#25262b; --line:#33353c;
+  --fg:#f3f2ec; --muted:#9c9ea6; --accent:#f5c518; --accent-ink:#151515;
+  --danger:#ff5d52; --ok:#5fd18b;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-num:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--font);overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.view{position:fixed;inset:0;display:flex;flex-direction:column}
+
+/* Top bar */
+.bar{display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 16px 10px;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar h1 small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.iconbtn{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;flex:none}
+.iconbtn:active{background:var(--panel2)}
+.iconbtn svg{width:22px;height:22px}
+.txtbtn{padding:8px 12px;border-radius:10px;font-weight:600;color:var(--accent);flex:none}
+.txtbtn:active{background:var(--panel2)}
+
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(var(--safe-b) + 110px)}
+
+/* Jobs */
+.joblist{display:flex;flex-direction:column;gap:10px}
+.job{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:var(--panel);text-align:left;width:100%}
+.job:active{background:var(--panel2)}
+.job .th{width:58px;height:58px;border-radius:10px;background:var(--panel2) center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--muted)}
+.job .meta{flex:1;min-width:0}
+.job .name{font-weight:650;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .count{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);text-align:right;flex:none}
+.job .count b{display:block;color:var(--fg);font-size:17px;font-family:var(--font)}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(245,197,24,.14);color:var(--accent);margin-top:3px}
+.pill.ok{background:rgba(95,209,139,.13);color:var(--ok)}
+.empty{color:var(--muted);text-align:center;padding:48px 20px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.empty strong{color:var(--fg);font-size:17px}
+.storage{margin-top:18px;color:var(--muted);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+
+.fab{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-b) + 16px);height:56px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font-weight:750;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.fab:active{transform:scale(.98)}
+.fab svg{width:22px;height:22px}
+
+/* Camera */
+#camera{background:#000}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.camtop{position:absolute;left:0;right:0;top:0;padding:calc(var(--safe-t) + 8px) 12px 18px;display:flex;align-items:center;gap:8px;background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,0))}
+.camtop .jobname{flex:1;min-width:0;text-align:center;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px #000}
+.camtop .iconbtn{background:rgba(0,0,0,.35)}
+.camtop .iconbtn.on{background:var(--accent);color:var(--accent-ink)}
+.chip{font-size:12px;font-weight:700;padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.45);letter-spacing:.03em;flex:none}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.cambottom{position:absolute;left:0;right:0;bottom:0;padding:22px 24px calc(var(--safe-b) + 22px);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.7))}
+.lastthumb{width:56px;height:56px;border-radius:12px;border:2px solid rgba(255,255,255,.85);background:#222 center/cover no-repeat;justify-self:start;position:relative}
+.lastthumb .n{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:800;display:grid;place-items:center;padding:0 5px;font-variant-numeric:tabular-nums}
+.shutter{width:80px;height:80px;border-radius:50%;border:5px solid #fff;padding:4px;background:transparent}
+.shutter i{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:transform .08s}
+.shutter:active i{transform:scale(.88);background:var(--accent)}
+.camhint{justify-self:end;color:#ddd;font-size:12px;text-align:right;max-width:90px;line-height:1.25}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.go{animation:fl .22s ease-out}
+@keyframes fl{0%{opacity:.75}100%{opacity:0}}
+.camerr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;color:var(--muted)}
+.camerr strong{color:var(--fg);font-size:18px}
+.btn{height:48px;padding:0 20px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.ghost{background:var(--panel2);color:var(--fg)}
+.btn.danger{background:var(--danger);color:#fff}
+
+/* Gallery */
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.actions .btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;gap:8px;height:46px}
+.actions .btn svg{width:19px;height:19px}
+.daylabel{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px}
+.cell{position:relative;aspect-ratio:1;max-width:100%;background:var(--panel2) center/cover no-repeat;border-radius:6px;overflow:hidden}
+.cell .dot{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px rgba(0,0,0,.5)}
+.cell .note{position:absolute;left:5px;bottom:5px;width:18px;height:18px;border-radius:5px;background:rgba(0,0,0,.6);display:grid;place-items:center}
+.cell .note svg{width:12px;height:12px}
+.cell .sel{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.3)}
+.cell.picked{outline:3px solid var(--accent);outline-offset:-3px}
+.cell.picked .sel{background:var(--accent);border-color:var(--accent)}
+.cell.picked .sel::after{content:"";position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.legend{color:var(--muted);font-size:12px;margin-top:14px;display:flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block}
+.selbar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(var(--safe-b) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.selbar .count{flex:1;font-weight:650}
+.selbar .btn{height:44px}
+
+/* Viewer */
+#viewer{background:#000;z-index:20}
+#viewer .imgwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+.navbtn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;display:grid;place-items:center;background:rgba(0,0,0,.35);border-radius:10px}
+.navbtn svg{width:24px;height:24px}
+.navbtn.prev{left:6px}.navbtn.next{right:6px}
+.vpanel{background:var(--panel);padding:12px 16px calc(var(--safe-b) + 12px);display:flex;flex-direction:column;gap:10px}
+.vmeta{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:16px/1.35 var(--font);padding:11px 12px;resize:none}
+.vrow{display:flex;gap:10px}
+.vrow .btn{flex:1;height:46px}
+
+/* Sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end}
+.sheet{width:100%;background:var(--panel);border-radius:20px 20px 0 0;padding:20px 16px calc(var(--safe-b) + 16px);display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto}
+.sheet h2{margin:0;font-size:19px}
+.sheet p{margin:0;color:var(--muted)}
+.sheet label{font-size:13px;color:var(--muted);font-weight:600;display:flex;flex-direction:column;gap:6px}
+.sheet .row{display:flex;gap:10px}
+.sheet .row .btn{flex:1}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 92px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+@media (prefers-reduced-motion:reduce){.flash.go{animation:none}.shutter i{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- JOBS -->
+<section id="jobs" class="view">
+  <header class="bar">
+    <div class="brand"><div class="mark">GL</div><h1>Job Photos<small>GLugo Electric</small></h1></div>
+  </header>
+  <div class="scroll">
+    <div id="joblist" class="joblist"></div>
+    <div id="jobsEmpty" class="empty" hidden>
+      <strong>No jobs yet</strong>
+      <span>Start a job, then every shutter tap saves a photo to it. Nothing goes to your iPhone Photos.</span>
+    </div>
+    <div id="storage" class="storage"></div>
+  </div>
+  <button class="fab" id="newJobBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New job</button>
+</section>
+
+<!-- CAMERA -->
+<section id="camera" class="view" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="flash" id="flash"></div>
+  <div class="camerr" id="camErr" hidden>
+    <strong>Camera is off</strong>
+    <span id="camErrMsg">Allow camera access for this app, then try again.</span>
+    <button class="btn" id="camRetry">Try again</button>
+    <button class="btn ghost" id="camFallback">Use iPhone camera instead</button>
+    <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+  </div>
+  <div class="camtop">
+    <button class="iconbtn" id="camBack" aria-label="Back to jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="jobname" id="camJob"></div>
+    <button class="chip on" id="stampBtn" aria-pressed="true">DATE STAMP</button>
+    <button class="iconbtn" id="torchBtn" aria-label="Flashlight" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
+  </div>
+  <div class="cambottom">
+    <button class="lastthumb" id="lastThumb" aria-label="Open job photos"><span class="n" id="camCount">0</span></button>
+    <button class="shutter" id="shutter" aria-label="Take photo"><i></i></button>
+    <div class="camhint">Each tap saves. No confirm.</div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section id="gallery" class="view" hidden>
+  <header class="bar">
+    <button class="iconbtn" id="galBack" aria-label="Back to jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="galTitle"></h1>
+    <button class="txtbtn" id="selectBtn">Select</button>
+  </header>
+  <div class="scroll">
+    <div class="actions">
+      <button class="btn" id="exportNewBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5"/></svg><span id="exportNewLbl">Save new to Drive</span></button>
+      <button class="btn ghost" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
+    </div>
+    <div id="galGrid"></div>
+    <div id="galEmpty" class="empty" hidden><strong>No photos yet</strong><span>Tap Take more to open the camera.</span></div>
+    <div class="legend" id="legend"><i></i> Already saved to Drive</div>
+    <div class="storage"><button class="txtbtn" id="editJobBtn" style="color:var(--muted)">Edit or delete job</button></div>
+  </div>
+  <div class="selbar" id="selBar" hidden>
+    <span class="count" id="selCount">0 selected</span>
+    <button class="btn ghost" id="selDelete">Delete</button>
+    <button class="btn" id="selShare">Save to Drive</button>
+  </div>
+</section>
+
+<!-- VIEWER -->
+<section id="viewer" class="view" hidden>
+  <header class="bar" style="background:#000;border-color:#222">
+    <button class="iconbtn" id="vClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h1 id="vTitle" style="font-size:16px"></h1>
+  </header>
+  <div class="imgwrap">
+    <img id="vImg" alt="Job photo">
+    <button class="navbtn prev" id="vPrev" aria-label="Previous photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="navbtn next" id="vNext" aria-label="Next photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="vpanel">
+    <div class="vmeta"><span id="vDate"></span><span id="vStatus"></span></div>
+    <textarea id="vNote" rows="2" placeholder="Add a note (e.g. main panel, before)"></textarea>
+    <div class="vrow">
+      <button class="btn ghost" id="vDelete">Delete</button>
+      <button class="btn" id="vShare">Save to Drive</button>
+    </div>
+  </div>
+</section>
+
+<!-- SHEETS -->
+<div class="scrim" id="jobSheet" hidden>
+  <form class="sheet" id="jobForm">
+    <h2 id="jobSheetTitle">New job</h2>
+    <label>Customer or job name<input type="text" id="jobName" placeholder="Smith – panel upgrade" required autocomplete="off"></label>
+    <label>Address or city (optional)<input type="text" id="jobAddr" placeholder="1234 Elm St, San Jose" autocomplete="off"></label>
+    <div class="row">
+      <button type="button" class="btn ghost" id="jobCancel">Cancel</button>
+      <button type="submit" class="btn" id="jobSave">Start shooting</button>
+    </div>
+    <button type="button" class="btn danger" id="jobDelete" hidden>Delete job and all its photos</button>
+  </form>
+</div>
+
+<div class="scrim" id="confirmSheet" hidden>
+  <div class="sheet">
+    <h2 id="cTitle"></h2>
+    <p id="cMsg"></p>
+    <div class="row">
+      <button class="btn ghost" id="cNo">Cancel</button>
+      <button class="btn danger" id="cYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<canvas id="cv" hidden></canvas>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const state = { job:null, photos:[], selecting:false, picked:new Set(), viewIdx:-1, stamp:true, urls:[] };
+let db, stream=null, track=null, torchOn=false;
+
+try { state.stamp = localStorage.getItem('stamp') !== '0'; } catch(e) {}
+
+/* ---------- storage ---------- */
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('glugo-job-photos',1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('jobs',{keyPath:'id'});
+      const p = d.createObjectStore('photos',{keyPath:'id',autoIncrement:true});
+      p.createIndex('jobId','jobId');
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const store = (n,m='readonly') => db.transaction(n,m).objectStore(n);
+const rq = r => new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+const allJobs = () => rq(store('jobs').getAll());
+const putJob = j => rq(store('jobs','readwrite').put(j));
+const jobPhotos = id => rq(store('photos').index('jobId').getAll(id));
+const countPhotos = id => rq(store('photos').index('jobId').count(id));
+function latestPhoto(id){
+  return new Promise(res=>{
+    const r = store('photos').index('jobId').openCursor(IDBKeyRange.only(id),'prev');
+    r.onsuccess = () => res(r.result ? r.result.value : null);
+    r.onerror = () => res(null);
+  });
+}
+const putPhoto = p => rq(store('photos','readwrite').put(p));
+function deletePhotos(ids){
+  return new Promise((res,rej)=>{
+    const t = db.transaction('photos','readwrite');
+    ids.forEach(id=>t.objectStore('photos').delete(id));
+    t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+  });
+}
+
+/* ---------- helpers ---------- */
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.hidden=false;
+  clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2400);
+}
+function show(id){ ['jobs','camera','gallery'].forEach(v=>$(v).hidden = v!==id); }
+function url(blob){ const u=URL.createObjectURL(blob); state.urls.push(u); return u; }
+function freeUrls(){ state.urls.forEach(u=>URL.revokeObjectURL(u)); state.urls=[]; }
+const fmtDate = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+const fmtTime = t => new Date(t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+const pad = n => String(n).padStart(2,'0');
+function fileName(job,p,i){
+  const d=new Date(p.taken);
+  const slug=(job.name||'job').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'job';
+  return `${slug}_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${i+1}.jpg`;
+}
+function confirmSheet(title,msg,yes='Delete'){
+  return new Promise(res=>{
+    $('cTitle').textContent=title; $('cMsg').textContent=msg; $('cYes').textContent=yes;
+    $('confirmSheet').hidden=false;
+    const done=v=>{ $('confirmSheet').hidden=true; $('cYes').onclick=$('cNo').onclick=null; res(v); };
+    $('cYes').onclick=()=>done(true); $('cNo').onclick=()=>done(false);
+  });
+}
+
+/* ---------- jobs view ---------- */
+async function renderJobs(){
+  freeUrls();
+  const jobs=(await allJobs()).sort((a,b)=>b.updated-a.updated);
+  const list=$('joblist'); list.textContent='';
+  $('jobsEmpty').hidden = jobs.length>0;
+  for(const j of jobs){
+    const [n,last,photos]=await Promise.all([countPhotos(j.id),latestPhoto(j.id),jobPhotos(j.id)]);
+    const unsaved=photos.filter(p=>!p.exported).length;
+    const b=document.createElement('button'); b.className='job';
+    const th=document.createElement('div'); th.className='th';
+    if(last) th.style.backgroundImage=`url(${url(last.thumb)})`;
+    else th.innerHTML='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+    const meta=document.createElement('div'); meta.className='meta';
+    const nm=document.createElement('div'); nm.className='name'; nm.textContent=j.name;
+    const sb=document.createElement('div'); sb.className='sub'; sb.textContent=(j.addr?j.addr+' · ':'')+fmtDate(j.updated);
+    meta.append(nm,sb);
+    if(n){ const pl=document.createElement('span'); pl.className='pill'+(unsaved?'':' ok'); pl.textContent=unsaved?`${unsaved} not in Drive`:'All in Drive'; meta.append(pl); }
+    const ct=document.createElement('div'); ct.className='count'; ct.innerHTML=`<b>${n}</b>photos`;
+    b.append(th,meta,ct);
+    b.onclick=()=>openGallery(j);
+    list.append(b);
+  }
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const e=await navigator.storage.estimate();
+      $('storage').textContent=`Using ${(e.usage/1048576).toFixed(0)} MB on this iPhone`;
+    }
+  }catch(e){}
+}
+
+function openJobSheet(job){
+  $('jobSheetTitle').textContent = job?'Edit job':'New job';
+  $('jobSave').textContent = job?'Save':'Start shooting';
+  $('jobName').value = job?job.name:''; $('jobAddr').value = job?(job.addr||''):'';
+  $('jobDelete').hidden = !job;
+  $('jobSheet').dataset.edit = job?job.id:'';
+  $('jobSheet').hidden=false;
+  setTimeout(()=>$('jobName').focus(),50);
+}
+$('newJobBtn').onclick=()=>openJobSheet(null);
+$('jobCancel').onclick=()=>$('jobSheet').hidden=true;
+$('jobForm').onsubmit=async e=>{
+  e.preventDefault();
+  const name=$('jobName').value.trim(); if(!name) return;
+  const editId=$('jobSheet').dataset.edit;
+  $('jobSheet').hidden=true;
+  if(editId){
+    state.job.name=name; state.job.addr=$('jobAddr').value.trim();
+    await putJob(state.job); $('galTitle').textContent=name; toast('Job saved');
+  } else {
+    const j={id:'j'+Date.now().toString(36),name,addr:$('jobAddr').value.trim(),created:Date.now(),updated:Date.now()};
+    await putJob(j); openCamera(j);
+  }
+};
+$('jobDelete').onclick=async()=>{
+  $('jobSheet').hidden=true;
+  const n=state.photos.length;
+  const unsaved=state.photos.filter(p=>!p.exported).length;
+  const ok=await confirmSheet(`Delete “${state.job.name}”?`, `${n} photo${n===1?'':'s'} will be removed from this app.`+(unsaved?` ${unsaved} haven’t been saved to Drive yet.`:''),'Delete job');
+  if(!ok) return;
+  await deletePhotos(state.photos.map(p=>p.id));
+  await rq(store('jobs','readwrite').delete(state.job.id));
+  toast('Job deleted'); goJobs();
+};
+function goJobs(){ stopCamera(); exitSelect(); show('jobs'); renderJobs(); }
+
+/* ---------- camera ---------- */
+async function openCamera(job){
+  state.job=job; freeUrls();
+  $('camJob').textContent=job.name;
+  const last=await latestPhoto(job.id);
+  $('lastThumb').style.backgroundImage = last?`url(${url(last.thumb)})`:'none';
+  $('camCount').textContent=await countPhotos(job.id);
+  updStamp();
+  show('camera'); startCamera();
+}
+async function startCamera(){
+  $('camErr').hidden=true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camError('This browser can’t open the live camera. Open the app from your Home Screen in Safari.'); return; }
+  try{
+    stopCamera();
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:4032},height:{ideal:3024}}});
+    const v=$('video'); v.srcObject=stream; await v.play().catch(()=>{});
+    track=stream.getVideoTracks()[0];
+    const caps=track.getCapabilities?track.getCapabilities():{};
+    $('torchBtn').hidden=!caps.torch; torchOn=false; $('torchBtn').classList.remove('on');
+  }catch(e){
+    camError(e&&e.name==='NotAllowedError'?'Camera access was blocked. In Settings → Safari → Camera, choose Allow or Ask, then try again.':'Couldn’t start the camera. Close other camera apps and try again.');
+  }
+}
+function camError(msg){ $('camErrMsg').textContent=msg; $('camErr').hidden=false; }
+function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); } stream=null; track=null; }
+$('camRetry').onclick=startCamera;
+$('camFallback').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const img=new Image(); img.src=URL.createObjectURL(f); await img.decode().catch(()=>{});
+  const c=$('cv'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0);
+  URL.revokeObjectURL(img.src); await saveFromCanvas(c);
+};
+$('camBack').onclick=goJobs;
+$('lastThumb').onclick=()=>{ stopCamera(); openGallery(state.job); };
+$('torchBtn').onclick=async()=>{
+  if(!track) return;
+  try{ torchOn=!torchOn; await track.applyConstraints({advanced:[{torch:torchOn}]}); $('torchBtn').classList.toggle('on',torchOn); }
+  catch(e){ torchOn=false; toast('Flashlight not available'); }
+};
+function updStamp(){ const b=$('stampBtn'); b.classList.toggle('on',state.stamp); b.setAttribute('aria-pressed',state.stamp); b.textContent=state.stamp?'DATE STAMP':'NO STAMP'; }
+$('stampBtn').onclick=()=>{ state.stamp=!state.stamp; try{localStorage.setItem('stamp',state.stamp?'1':'0');}catch(e){} updStamp(); toast(state.stamp?'Date and job name will print on photos':'Photos saved without stamp'); };
+
+function drawStamp(ctx,w,h,t){
+  const txt=`${state.job.name}  ·  ${fmtDate(t)} ${fmtTime(t)}`;
+  const fs=Math.round(Math.max(w,h)*0.022);
+  ctx.font=`600 ${fs}px -apple-system, Helvetica, Arial, sans-serif`;
+  const pd=fs*0.5, tw=ctx.measureText(txt).width;
+  const x=fs*0.8, y=h-fs*0.8;
+  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(x-pd, y-fs-pd*0.6, tw+pd*2, fs+pd*1.6);
+  ctx.fillStyle='#f5c518'; ctx.textBaseline='alphabetic'; ctx.fillText(txt, x, y);
+}
+const blobOf=(c,q)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
+async function saveFromCanvas(c){
+  const t=Date.now();
+  if(state.stamp) drawStamp(c.getContext('2d'),c.width,c.height,t);
+  const s=240/Math.min(c.width,c.height);
+  const tc=document.createElement('canvas'); tc.width=Math.round(c.width*s); tc.height=Math.round(c.height*s);
+  tc.getContext('2d').drawImage(c,0,0,tc.width,tc.height);
+  const [blob,thumb]=await Promise.all([blobOf(c,0.92),blobOf(tc,0.75)]);
+  if(!blob){ toast('Photo didn’t save. Try again.'); return; }
+  try{
+    await putPhoto({jobId:state.job.id,blob,thumb,taken:t,note:'',exported:false});
+    state.job.updated=t; putJob(state.job);
+    $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
+    $('camCount').textContent=Number($('camCount').textContent)+1;
+  }catch(e){ toast('Storage is full. Save photos to Drive and delete some.'); }
+}
+$('shutter').onclick=()=>{
+  const v=$('video'); if(!stream||!v.videoWidth) return;
+  const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  const f=$('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  saveFromCanvas(c);
+};
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) stopCamera();
+  else if(!$('camera').hidden) startCamera();
+});
+
+/* ---------- gallery ---------- */
+async function openGallery(job){
+  state.job=job; freeUrls(); exitSelect();
+  $('galTitle').textContent=job.name;
+  state.photos=(await jobPhotos(job.id)).sort((a,b)=>a.taken-b.taken);
+  renderGallery(); show('gallery');
+}
+function renderGallery(){
+  const g=$('galGrid'); g.textContent='';
+  const ps=state.photos;
+  $('galEmpty').hidden=ps.length>0;
+  $('legend').hidden=!ps.some(p=>p.exported);
+  const unsaved=ps.filter(p=>!p.exported).length;
+  $('exportNewLbl').textContent = unsaved?`Save ${unsaved} new to Drive`:'All saved to Drive';
+  $('exportNewBtn').disabled=!unsaved; $('exportNewBtn').style.opacity=unsaved?1:.5;
+  let day='', grid=null;
+  ps.forEach((p,i)=>{
+    const d=fmtDate(p.taken);
+    if(d!==day){ day=d; const l=document.createElement('div'); l.className='daylabel'; l.textContent=d; g.append(l); grid=document.createElement('div'); grid.className='grid'; g.append(grid); }
+    const c=document.createElement('button'); c.className='cell'+(state.picked.has(p.id)?' picked':'');
+    c.style.backgroundImage=`url(${url(p.thumb)})`; c.setAttribute('aria-label','Photo '+fmtTime(p.taken));
+    if(p.exported) c.insertAdjacentHTML('beforeend','<span class="dot"></span>');
+    if(p.note) c.insertAdjacentHTML('beforeend','<span class="note"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg></span>');
+    if(state.selecting) c.insertAdjacentHTML('beforeend','<span class="sel"></span>');
+    c.onclick=()=>{
+      if(state.selecting){ state.picked.has(p.id)?state.picked.delete(p.id):state.picked.add(p.id); c.classList.toggle('picked'); updSel(); }
+      else openViewer(i);
+    };
+    grid.append(c);
+  });
+}
+function updSel(){ const n=state.picked.size; $('selCount').textContent=`${n} selected`; $('selShare').disabled=$('selDelete').disabled=!n; $('selShare').style.opacity=$('selDelete').style.opacity=n?1:.5; }
+function exitSelect(){ state.selecting=false; state.picked.clear(); $('selBar').hidden=true; $('selectBtn').textContent='Select'; }
+$('selectBtn').onclick=()=>{
+  if(state.selecting){ exitSelect(); } else { state.selecting=true; $('selBar').hidden=false; $('selectBtn').textContent='Done'; updSel(); }
+  renderGallery();
+};
+$('galBack').onclick=goJobs;
+$('moreShotsBtn').onclick=()=>openCamera(state.job);
+$('editJobBtn').onclick=()=>openJobSheet(state.job);
+
+async function shareToDrive(list){
+  if(!list.length) return;
+  const files=list.map(p=>new File([p.blob],fileName(state.job,p,state.photos.indexOf(p)),{type:'image/jpeg'}));
+  if(!navigator.share||!navigator.canShare||!navigator.canShare({files})){
+    toast('Sharing isn’t available here. Open the app from your Home Screen in Safari.'); return false;
+  }
+  try{
+    await navigator.share({files});
+  }catch(e){
+    if(e&&e.name==='AbortError') return false;
+    toast('Couldn’t open the share sheet. Try fewer photos at a time.'); return false;
+  }
+  for(const p of list){ p.exported=true; await putPhoto(p); }
+  toast(`${list.length} photo${list.length===1?'':'s'} marked as saved`);
+  return true;
+}
+$('exportNewBtn').onclick=async()=>{ if(await shareToDrive(state.photos.filter(p=>!p.exported))) renderGallery(); };
+$('selShare').onclick=async()=>{
+  const list=state.photos.filter(p=>state.picked.has(p.id));
+  if(await shareToDrive(list)){ exitSelect(); renderGallery(); }
+};
+$('selDelete').onclick=async()=>{
+  const list=state.photos.filter(p=>state.picked.has(p.id));
+  const unsaved=list.filter(p=>!p.exported).length;
+  const ok=await confirmSheet(`Delete ${list.length} photo${list.length===1?'':'s'}?`, unsaved?`${unsaved} of these haven’t been saved to Drive yet.`:'They’re already saved to Drive.');
+  if(!ok) return;
+  await deletePhotos(list.map(p=>p.id));
+  state.photos=state.photos.filter(p=>!state.picked.has(p.id));
+  exitSelect(); renderGallery(); toast('Deleted');
+};
+
+/* ---------- viewer ---------- */
+let vUrl=null;
+function openViewer(i){
+  state.viewIdx=i; const p=state.photos[i];
+  if(vUrl) URL.revokeObjectURL(vUrl);
+  vUrl=URL.createObjectURL(p.blob); $('vImg').src=vUrl;
+  $('vTitle').textContent=`${i+1} of ${state.photos.length}`;
+  $('vDate').textContent=`${fmtDate(p.taken)} · ${fmtTime(p.taken)}`;
+  $('vStatus').textContent=p.exported?'Saved to Drive':'Not in Drive yet';
+  $('vStatus').style.color=p.exported?'var(--ok)':'var(--accent)';
+  $('vNote').value=p.note||'';
+  $('vPrev').hidden=i===0; $('vNext').hidden=i===state.photos.length-1;
+  $('viewer').hidden=false;
+}
+async function saveNote(){
+  const p=state.photos[state.viewIdx]; if(!p) return;
+  const v=$('vNote').value.trim(); if(v===(p.note||'')) return;
+  p.note=v; await putPhoto(p);
+}
+async function closeViewer(){ await saveNote(); $('viewer').hidden=true; if(vUrl){URL.revokeObjectURL(vUrl);vUrl=null;} renderGallery(); }
+$('vClose').onclick=closeViewer;
+$('vNote').onblur=saveNote;
+$('vPrev').onclick=async()=>{ await saveNote(); openViewer(state.viewIdx-1); };
+$('vNext').onclick=async()=>{ await saveNote(); openViewer(state.viewIdx+1); };
+let tx0=null;
+$('vImg').addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;},{passive:true});
+$('vImg').addEventListener('touchend',async e=>{
+  if(tx0===null) return; const dx=e.changedTouches[0].clientX-tx0; tx0=null;
+  if(Math.abs(dx)<50) return;
+  const n=state.viewIdx+(dx<0?1:-1);
+  if(n>=0&&n<state.photos.length){ await saveNote(); openViewer(n); }
+});
+$('vShare').onclick=async()=>{ const ok=await shareToDrive([state.photos[state.viewIdx]]); await saveNote(); if(ok) openViewer(state.viewIdx); };
+$('vDelete').onclick=async()=>{
+  const p=state.photos[state.viewIdx];
+  const ok=await confirmSheet('Delete this photo?', p.exported?'It’s already saved to Drive.':'It hasn’t been saved to Drive yet.');
+  if(!ok) return;
+  await deletePhotos([p.id]); state.photos.splice(state.viewIdx,1);
+  if(!state.photos.length){ closeViewer(); return; }
+  openViewer(Math.min(state.viewIdx,state.photos.length-1));
+};
+
+/* ---------- boot ---------- */
+(async()=>{
+  try{
+    db=await openDB();
+    if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    renderJobs();
+  }catch(e){
+    $('jobsEmpty').hidden=false;
+    $('jobsEmpty').innerHTML='<strong>Storage is blocked</strong><span>Turn off Private Browsing in Safari and open the app again.</span>';
+  }
+  if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+})();
+</script>
+</body>
+</html>
