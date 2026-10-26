@@ -85,6 +85,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .modes{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 128px);display:flex;justify-content:center;gap:6px}
 .modes button{font-size:13px;font-weight:750;letter-spacing:.08em;padding:7px 14px;border-radius:999px;color:#ddd;background:rgba(0,0,0,.35)}
 .modes button.on{background:var(--accent);color:var(--accent-ink)}
+.lenses{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 176px);display:flex;justify-content:center;gap:12px}
+.lenses button{width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-weight:750;font-size:13px;border:1.5px solid rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
+.lenses button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .shutter.vid i{background:#ff3b30}
 .shutter.rec i{transform:scale(.5);border-radius:8px;background:#ff3b30}
 .shutter.vid:active i{background:#ff3b30}
@@ -192,6 +195,7 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
     <button class="iconbtn" id="torchBtn" aria-label="Flashlight" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
   </div>
   <div class="rectimer" id="recTimer" hidden><i></i><span id="recTime">0:00</span><span style="color:#aaa">/ 3:00</span></div>
+  <div class="lenses" id="lenses" hidden></div>
   <div class="modes" id="modes">
     <button id="modePhoto" class="on" aria-pressed="true">PHOTO</button>
     <button id="modeVideo" aria-pressed="false">VIDEO</button>
@@ -486,7 +490,7 @@ async function openCamera(job){
   updStamp();
   show('camera'); startCamera();
 }
-async function startCamera(){
+async function startCamera(again){
   $('camErr').hidden=true;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camError('This browser can’t open the live camera. Open the app from your Home Screen in Safari.'); return; }
   try{
@@ -494,15 +498,30 @@ async function startCamera(){
     const vid = state.mode==='video'
       ? {facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}
       : {facingMode:{ideal:'environment'},width:{ideal:4032},height:{ideal:3024}};
-    if(state.mode==='video'){
-      try{ stream=await navigator.mediaDevices.getUserMedia({audio:true,video:vid}); }
-      catch(err){
-        if(err&&err.name==='NotAllowedError'){ stream=await navigator.mediaDevices.getUserMedia({audio:false,video:vid}); toast('Microphone is blocked, so videos will have no sound'); }
-        else throw err;
+    const open=async v=>{
+      if(state.mode==='video'){
+        try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:v}); }
+        catch(err){
+          if(err&&err.name==='NotAllowedError'){ const s2=await navigator.mediaDevices.getUserMedia({audio:false,video:v}); toast('Microphone is blocked, so videos will have no sound'); return s2; }
+          throw err;
+        }
       }
-    } else stream=await navigator.mediaDevices.getUserMedia({audio:false,video:vid});
+      return navigator.mediaDevices.getUserMedia({audio:false,video:v});
+    };
+    const id=lens.ids[lens.want];
+    if(id){
+      const v2=Object.assign({},vid,{deviceId:{exact:id}}); delete v2.facingMode;
+      try{ stream=await open(v2); }
+      catch(err){ if(err&&err.name==='NotAllowedError') throw err; lens.ids={}; stream=await open(vid); }
+    } else stream=await open(vid);
     const v=$('video'); v.srcObject=stream; await v.play().catch(()=>{});
     track=stream.getVideoTracks()[0];
+    await findLenses();
+    const sid=track.getSettings?track.getSettings().deviceId:null;
+    lens.cur=Object.keys(lens.ids).find(k=>lens.ids[k]===sid)||'1';
+    // First time on this phone: the lens list only shows up after access is allowed, so switch once if needed.
+    if(!again&&lens.want!==lens.cur&&lens.ids[lens.want]) return startCamera(true);
+    renderLenses();
     const caps=track.getCapabilities?track.getCapabilities():{};
     $('torchBtn').hidden=!caps.torch; torchOn=false; $('torchBtn').classList.remove('on');
   }catch(e){
@@ -521,6 +540,41 @@ $('fileIn').onchange=async e=>{
 };
 $('camBack').onclick=async()=>{ await stopRecording(); goJobs(); };
 $('lastThumb').onclick=async()=>{ await stopRecording(); stopCamera(); openGallery(state.job); };
+
+/* ---------- lenses (0.5× ultra wide / 1× / telephoto) ---------- */
+const lens={ want:'1', cur:'1', ids:{} };
+try{ lens.want=localStorage.getItem('gjp.lens')||'1'; lens.ids=JSON.parse(localStorage.getItem('gjp.lensIds')||'{}'); }catch(e){}
+// iPhone Safari lists each back camera by name once camera access is allowed.
+async function findLenses(){
+  try{
+    const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.label);
+    const ids={};
+    for(const d of devs){
+      const l=d.label.toLowerCase();
+      if(l.includes('front')||l.includes('dual')||l.includes('triple')) continue;
+      if(l.includes('ultra wide')) ids['0.5']=d.deviceId;
+      else if(l.includes('telephoto')) ids.tele=d.deviceId;
+      else if(l.includes('back')) ids['1']=d.deviceId;
+    }
+    if(ids['1']||ids['0.5']){ lens.ids=ids; try{ localStorage.setItem('gjp.lensIds',JSON.stringify(ids)); }catch(e){} }
+  }catch(e){}
+}
+function renderLenses(){
+  const box=$('lenses'); box.textContent='';
+  const opts=[['0.5','0.5×'],['1','1×'],['tele','Zoom']].filter(([k])=>lens.ids[k]);
+  box.hidden=opts.length<2||!!rec;
+  for(const [k,label] of opts){
+    const b=document.createElement('button'); b.type='button'; b.textContent=label;
+    b.className=k===lens.cur?'on':''; b.setAttribute('aria-pressed',k===lens.cur);
+    b.setAttribute('aria-label',k==='0.5'?'Wide angle 0.5x':k==='1'?'Normal 1x':'Zoom lens');
+    b.onclick=()=>setLens(k); box.append(b);
+  }
+}
+function setLens(k){
+  if(rec||k===lens.cur) return;
+  lens.want=k; try{ localStorage.setItem('gjp.lens',k); }catch(e){}
+  startCamera();
+}
 
 /* ---------- video ---------- */
 const MAX_SEC=180;
@@ -571,7 +625,7 @@ async function startRecording(){
   recDone=new Promise(res=>{ rec.onstop=async()=>{ await Promise.all(recWrites); await finishRecording(myId); res(); }; });
   rec.start(1000);
   $('shutter').classList.add('rec'); $('shutter').setAttribute('aria-label','Stop recording');
-  $('modes').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
+  $('modes').hidden=true; $('lenses').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
   recTimerId=setInterval(()=>{
     const sec=(Date.now()-recStart)/1000; $('recTime').textContent=fmtDur(sec);
     if(sec>=MAX_SEC){ toast('3-minute limit reached. Video saved.'); stopRecording(); }
@@ -582,7 +636,7 @@ async function stopRecording(){
   const r=rec, done=recDone; rec=null;
   clearInterval(recTimerId);
   $('shutter').classList.remove('rec'); $('shutter').setAttribute('aria-label','Start recording');
-  $('modes').hidden=false; $('recTimer').hidden=true;
+  $('modes').hidden=false; $('recTimer').hidden=true; renderLenses();
   try{ if(r.state!=='inactive'){ r.requestData&&r.requestData(); r.stop(); } }catch(e){}
   await done;
 }
