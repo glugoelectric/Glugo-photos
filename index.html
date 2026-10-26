@@ -153,6 +153,37 @@ textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid v
 select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:16px var(--font);padding:11px 12px;-webkit-appearance:none}
 .sheet .hint{font-size:13px}
 .drivelink{color:var(--accent);font-weight:600;text-decoration:none;text-align:center;padding:4px}
+.card{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.card h3{margin:0;font-size:12px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.card h3 span{color:var(--accent);letter-spacing:.04em}
+.card textarea{min-height:76px}
+.todo{display:flex;align-items:center;gap:10px;min-height:44px}
+.todo .chk{width:30px;height:30px;border-radius:8px;border:2px solid var(--accent);flex:none;display:grid;place-items:center;background:transparent}
+.todo.done .chk{background:var(--accent)}
+.todo.done .chk::after{content:"";width:7px;height:13px;border:solid var(--accent-ink);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
+.todo span{flex:1;min-width:0;overflow-wrap:anywhere}
+.todo.done span{color:var(--muted);text-decoration:line-through}
+.todo .del{width:38px;height:38px;border-radius:10px;background:var(--panel2);color:var(--fg);flex:none;display:grid;place-items:center;border:1px solid var(--line)}
+.todo .del svg{width:16px;height:16px}
+.todoadd{display:flex;gap:8px}
+.todoadd input{flex:1;min-width:0}
+.todoadd .btn{height:46px;padding:0 18px;flex:none}
+.reportbox{display:flex;align-items:center;gap:10px;background:var(--panel);border:1.5px solid var(--ok);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.reportbox span{flex:1;min-width:0;font-size:14px}
+.reportbox .btn{height:40px;display:inline-flex;align-items:center;text-decoration:none;padding:0 14px;flex:none}
+.actions .btn:disabled{opacity:.6}
+#reportBtn{border:1.5px solid var(--accent);color:var(--accent)}
+.camright{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.notebtn{height:44px;padding:0 14px;border-radius:12px;background:rgba(0,0,0,.6);border:1.5px solid var(--accent);color:var(--accent);font-weight:750;display:flex;align-items:center;gap:6px}
+.notebtn svg{width:18px;height:18px}
+.sheethead{display:grid;grid-template-columns:44px 1fr 44px;align-items:center}
+.sheethead .btn{justify-self:center;min-width:150px;height:44px}
+.iconbtn.close{background:var(--panel2);border:1px solid var(--line)}
+.toggle{height:48px;border-radius:12px;background:var(--panel2);border:1.5px solid var(--line);font-weight:650;display:flex;align-items:center;gap:10px;padding:0 12px;text-align:left}
+.toggle i{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);flex:none;display:grid;place-items:center}
+.toggle[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.toggle[aria-pressed="true"] i{background:var(--accent);border-color:var(--accent)}
+.toggle[aria-pressed="true"] i::after{content:"";width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 92px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 @media (prefers-reduced-motion:reduce){.rectimer i{animation:none}.sync.busy i{animation:none}.flash.go{animation:none}.shutter i{transition:none}}
 </style>
@@ -203,7 +234,10 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
   <div class="cambottom">
     <button class="lastthumb" id="lastThumb" aria-label="Open job photos"><span class="n" id="camCount">0</span></button>
     <button class="shutter" id="shutter" aria-label="Take photo"><i></i></button>
-    <div class="camhint" id="camHint">Each tap saves. No confirm.</div>
+    <div class="camright">
+      <button class="notebtn" id="camNoteBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>Note</button>
+      <div class="camhint" id="camHint">Each tap saves. No confirm.</div>
+    </div>
   </div>
 </section>
 
@@ -218,7 +252,18 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
     <button class="sync" id="galSync" type="button"><i></i><span id="galSyncTxt"></span><b id="galSyncAct"></b></button>
     <div class="actions">
       <button class="btn" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
+      <button class="btn ghost" id="reportBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg><span id="reportLbl">Make report</span></button>
     </div>
+    <div class="reportbox" id="reportBox" hidden><span id="reportTxt"></span><a class="btn" id="reportLink" href="#" target="_blank" rel="noopener">Open report</a></div>
+    <section class="card">
+      <h3>Job notes</h3>
+      <textarea id="jobNotes" rows="3" placeholder="Scope, what the customer asked for, gate code… Tap the mic on the keyboard to talk."></textarea>
+    </section>
+    <section class="card">
+      <h3>To-do <span id="todoCount"></span></h3>
+      <div id="todoList"></div>
+      <form class="todoadd" id="todoForm"><input type="text" id="todoIn" placeholder="Add a to-do (e.g. replace meter main)" autocomplete="off"><button class="btn" type="submit">Add</button></form>
+    </section>
     <div id="galGrid"></div>
     <div id="galEmpty" class="empty" hidden><strong>No photos yet</strong><span>Tap Take more to open the camera.</span></div>
     <div class="legend" id="legend"><i></i> Backed up to Google Drive</div>
@@ -284,6 +329,20 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
   </form>
 </div>
 
+<div class="scrim" id="noteSheet" hidden>
+  <div class="sheet">
+    <div class="sheethead">
+      <button class="iconbtn close" id="noteX" type="button" aria-label="Close and save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="btn" id="noteDone" type="button">Done</button>
+      <span></span>
+    </div>
+    <h2 id="noteTitle">Note</h2>
+    <p class="hint">Tap the mic on the keyboard and talk.</p>
+    <textarea id="noteText" rows="4" placeholder="What needs to be done here?"></textarea>
+    <button class="toggle" id="noteTodo" type="button" aria-pressed="false"><i></i>Also add to the to-do list</button>
+  </div>
+</div>
+
 <div class="scrim" id="confirmSheet" hidden>
   <div class="sheet">
     <h2 id="cTitle"></h2>
@@ -329,6 +388,13 @@ const store = (n,m='readonly') => db.transaction(n,m).objectStore(n);
 const rq = r => new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
 const allJobs = () => rq(store('jobs').getAll());
 const putJob = j => rq(store('jobs','readwrite').put(j));
+// Read the latest copy of a job, change it, save it. Keeps notes, to-dos and folder info from overwriting each other.
+async function updateJob(id,fn){
+  const j=await rq(store('jobs').get(id)); if(!j) return null;
+  fn(j); await putJob(j);
+  if(state.job&&state.job.id===id) Object.assign(state.job,j);
+  return j;
+}
 const jobPhotos = id => rq(store('photos').index('jobId').getAll(id));
 const countPhotos = id => rq(store('photos').index('jobId').count(id));
 function latestPhoto(id){
@@ -430,7 +496,9 @@ async function renderJobs(){
     const nm=document.createElement('div'); nm.className='name'; nm.textContent=j.name;
     const sb=document.createElement('div'); sb.className='sub'; sb.textContent=(j.addr?j.addr+' · ':'')+fmtDate(j.updated);
     meta.append(nm,sb);
+    const openTodos=(j.todos||[]).filter(t=>!t.done).length;
     if(n){ const pl=document.createElement('span'); pl.className='pill'+(unsaved?'':' ok'); pl.textContent=unsaved?`${unsaved} waiting for Drive`:'All in Drive'; meta.append(pl); }
+    if(openTodos){ const tp=document.createElement('span'); tp.className='pill'; tp.style.marginLeft='6px'; tp.textContent=`${openTodos} to-do`; meta.append(tp); }
     const ct=document.createElement('div'); ct.className='count'; ct.innerHTML=`<b>${n}</b>files`;
     b.append(th,meta,ct);
     b.onclick=()=>openGallery(j);
@@ -482,7 +550,7 @@ function goJobs(){ stopCamera(); exitSelect(); show('jobs'); renderJobs(); }
 
 /* ---------- camera ---------- */
 async function openCamera(job){
-  state.job=job; freeUrls();
+  state.job=job; state.lastId=null; freeUrls();
   $('camJob').textContent=job.name;
   const last=await latestPhoto(job.id);
   $('lastThumb').style.backgroundImage = last&&last.thumbBuf?`url(${thumbUrl(last)})`:'none';
@@ -625,7 +693,7 @@ async function startRecording(){
   recDone=new Promise(res=>{ rec.onstop=async()=>{ await Promise.all(recWrites); await finishRecording(myId); res(); }; });
   rec.start(1000);
   $('shutter').classList.add('rec'); $('shutter').setAttribute('aria-label','Stop recording');
-  $('modes').hidden=true; $('lenses').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
+  $('modes').hidden=true; $('lenses').hidden=true; $('camNoteBtn').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
   recTimerId=setInterval(()=>{
     const sec=(Date.now()-recStart)/1000; $('recTime').textContent=fmtDur(sec);
     if(sec>=MAX_SEC){ toast('3-minute limit reached. Video saved.'); stopRecording(); }
@@ -636,7 +704,7 @@ async function stopRecording(){
   const r=rec, done=recDone; rec=null;
   clearInterval(recTimerId);
   $('shutter').classList.remove('rec'); $('shutter').setAttribute('aria-label','Start recording');
-  $('modes').hidden=false; $('recTimer').hidden=true; renderLenses();
+  $('modes').hidden=false; $('recTimer').hidden=true; $('camNoteBtn').hidden=false; renderLenses();
   try{ if(r.state!=='inactive'){ r.requestData&&r.requestData(); r.stop(); } }catch(e){}
   await done;
 }
@@ -647,8 +715,9 @@ async function finishRecording(id){
   if(meta&&pieces.length){
     const buf=await bufOf(new Blob(pieces,{type:meta.mime}));
     const dur=Math.max(1,Math.round((Date.now()-meta.started)/1000));
-    await addItem({jobId:meta.jobId,type:'video',mime:meta.mime,thumbBuf:meta.thumbBuf||null,taken:meta.started,duration:meta.recovered?null:dur,note:''},buf);
-    const j=await rq(store('jobs').get(meta.jobId)); if(j){ j.updated=Date.now(); await putJob(j); }
+    const m=await addItem({jobId:meta.jobId,type:'video',mime:meta.mime,thumbBuf:meta.thumbBuf||null,taken:meta.started,duration:meta.recovered?null:dur,note:''},buf);
+    if(state.job&&state.job.id===meta.jobId) state.lastId=m.id;
+    await updateJob(meta.jobId,j=>{ j.updated=Date.now(); });
     if(state.job&&state.job.id===meta.jobId&&!$('camera').hidden){
       if(meta.thumbBuf) $('lastThumb').style.backgroundImage=`url(${url(new Blob([meta.thumbBuf],{type:'image/jpeg'}))})`;
       $('camCount').textContent=Number($('camCount').textContent)+1;
@@ -692,8 +761,9 @@ async function saveFromCanvas(c){
   if(!blob){ toast('Photo didn’t save. Try again.'); return; }
   try{
     const [buf,thumbBuf]=await Promise.all([bufOf(blob),thumb?bufOf(thumb):null]);
-    await addItem({jobId:state.job.id,type:'photo',mime:'image/jpeg',thumbBuf,taken:t,note:''},buf);
-    state.job.updated=t; putJob(state.job);
+    const m=await addItem({jobId:state.job.id,type:'photo',mime:'image/jpeg',thumbBuf,taken:t,note:''},buf);
+    state.lastId=m.id;
+    updateJob(state.job.id,j=>{ j.updated=t; });
     if(thumb) $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
     $('camCount').textContent=Number($('camCount').textContent)+1;
     runUploads();
@@ -717,7 +787,7 @@ async function openGallery(job){
   state.job=job; freeUrls(); exitSelect();
   $('galTitle').textContent=job.name;
   state.photos=(await jobPhotos(job.id)).sort((a,b)=>a.taken-b.taken);
-  renderGallery(); show('gallery');
+  renderJobExtras(); renderGallery(); show('gallery');
 }
 function renderGallery(){
   const g=$('galGrid'); g.textContent='';
@@ -749,8 +819,8 @@ $('selectBtn').onclick=()=>{
   if(state.selecting){ exitSelect(); } else { state.selecting=true; $('selBar').hidden=false; $('selectBtn').textContent='Done'; updSel(); }
   renderGallery();
 };
-$('galBack').onclick=goJobs;
-$('moreShotsBtn').onclick=()=>openCamera(state.job);
+$('galBack').onclick=async()=>{ await saveJobNotes(); goJobs(); };
+$('moreShotsBtn').onclick=async()=>{ await saveJobNotes(); openCamera(state.job); };
 $('editJobBtn').onclick=()=>openJobSheet(state.job);
 
 async function shareToDrive(list){
@@ -811,7 +881,7 @@ async function openViewer(i){
 async function saveNote(){
   const p=state.photos[state.viewIdx]; if(!p) return;
   const v=$('vNote').value.trim(); if(v===(p.note||'')) return;
-  p.note=v; await putPhoto(p);
+  p.note=v; if(p.driveId) p.noteDirty=true; await putPhoto(p); runUploads();
 }
 async function closeViewer(){ $('vVid').pause(); await saveNote(); $('viewer').hidden=true; if(vUrl){URL.revokeObjectURL(vUrl);vUrl=null;} renderGallery(); }
 $('vClose').onclick=closeViewer;
@@ -837,9 +907,12 @@ $('vDelete').onclick=async()=>{
 };
 
 /* ---------- Google Drive backup ---------- */
-function folderName(job){
-  if(!job.folder){ job.folder=(job.name+(job.addr?' – '+job.addr:'')).replace(/[\/\\]/g,'-').trim().slice(0,100); putJob(job); }
-  return job.folder;
+async function folderName(job){
+  if(job.folder) return job.folder;
+  const f=(job.name+(job.addr?' – '+job.addr:'')).replace(/[\/\\]/g,'-').trim().slice(0,100);
+  job.folder=f;
+  await updateJob(job.id,j=>{ if(!j.folder) j.folder=f; });
+  return f;
 }
 function b64(blob){
   return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(blob); });
@@ -864,7 +937,7 @@ async function uploadBig(p,job,file){
     if(st.expired){ p.up=null; await putPhoto(p); return uploadBig(p,job,file); }
     p.up.offset=st.next;
   } else {
-    const r=await callDrive({action:'start',folder:folderName(job),name:fileName(job,p),note:p.note||'',mime,size:total});
+    const r=await callDrive({action:'start',folder:await folderName(job),name:fileName(job,p),note:p.note||'',mime,size:total});
     if(r.id) return r;
     p.up={session:r.session,offset:0}; await putPhoto(p);
   }
@@ -897,7 +970,7 @@ async function runUploads(){
         let file;
         try{ file=await getMedia(p); }catch(e){ file=null; }
         if(!file){ p.broken=true; await putPhoto(p); list=await pendingList(); continue; }
-        const res=(p.type==='video'||file.size>BIG)?await uploadBig(p,job,file):await callDrive({action:'upload',folder:folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(file)});
+        const res=(p.type==='video'||file.size>BIG)?await uploadBig(p,job,file):await callDrive({action:'upload',folder:await folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(file)});
         p.driveId=res.id; await putPhoto(p); did++;
         const g=state.photos.find(x=>x.id===p.id); if(g){ g.driveId=res.id; if(!$('gallery').hidden&&$('viewer').hidden) renderGallery(); }
       }
@@ -905,6 +978,7 @@ async function runUploads(){
     }
     sync.err=''; sync.left=0;
     await prune();
+    await syncNotes();
   }catch(e){ sync.err=e.message; sync.pct=null; sync.left=(await pendingList()).length; }
   finally{ sync.busy=false; updSync(); if(did&&!$('jobs').hidden) renderJobs(); }
 }
@@ -941,7 +1015,7 @@ function openSettings(){
   $('setSheet').hidden=false;
 }
 $('setBtn').onclick=openSettings;
-$('setClose').onclick=()=>$('setSheet').hidden=true;
+$('setClose').onclick=()=>{ const f=$('setForm'); if(f.requestSubmit) f.requestSubmit(); else $('setSheet').hidden=true; };
 function readSettings(){ return { url:$('setUrl').value.trim(), key:$('setKey').value.trim(), keep:Number($('setKeep').value) }; }
 $('setTest').onclick=async()=>{
   const s=readSettings();
@@ -964,6 +1038,128 @@ $('setForm').onsubmit=e=>{
 window.addEventListener('online',()=>{ sync.err=''; runUploads(); });
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) runUploads(); });
 setInterval(runUploads,30000);
+
+/* ---------- job notes, to-do, camera notes, report ---------- */
+let notesTimer=null, notesFor=null;
+function autoGrow(t){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight+2,320)+'px'; }
+function renderJobExtras(){
+  const j=state.job; notesFor=j.id;
+  $('jobNotes').value=j.notes||''; requestAnimationFrame(()=>autoGrow($('jobNotes')));
+  renderTodos(); renderReport();
+}
+async function saveJobNotes(){
+  clearTimeout(notesTimer);
+  if(!notesFor) return;
+  const v=$('jobNotes').value, id=notesFor;
+  const cur=await rq(store('jobs').get(id)); if(!cur||(cur.notes||'')===v) return;
+  await updateJob(id,j=>{ j.notes=v; });
+}
+$('jobNotes').addEventListener('input',()=>{ autoGrow($('jobNotes')); clearTimeout(notesTimer); notesTimer=setTimeout(saveJobNotes,600); });
+$('jobNotes').addEventListener('blur',saveJobNotes);
+
+const X_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function renderTodos(){
+  const list=$('todoList'); list.textContent='';
+  const todos=(state.job&&state.job.todos)||[];
+  const open=todos.filter(t=>!t.done).length;
+  $('todoCount').textContent=todos.length?`${open} open`:'';
+  for(const t of todos){
+    const row=document.createElement('div'); row.className='todo'+(t.done?' done':'');
+    const chk=document.createElement('button'); chk.type='button'; chk.className='chk'; chk.setAttribute('aria-label',t.done?'Mark not done':'Mark done');
+    chk.onclick=()=>toggleTodo(t.id);
+    const sp=document.createElement('span'); sp.textContent=t.text;
+    const del=document.createElement('button'); del.type='button'; del.className='del'; del.setAttribute('aria-label','Remove'); del.innerHTML=X_SVG;
+    del.onclick=()=>removeTodo(t.id);
+    row.append(chk,sp,del); list.append(row);
+  }
+}
+async function addTodo(text,jobId){
+  text=String(text||'').trim(); if(!text) return;
+  await updateJob(jobId||state.job.id,j=>{ j.todos=j.todos||[]; j.todos.push({id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),text,done:false}); });
+  if(!$('gallery').hidden) renderTodos();
+}
+async function toggleTodo(id){ await updateJob(state.job.id,j=>{ const t=(j.todos||[]).find(x=>x.id===id); if(t) t.done=!t.done; }); renderTodos(); }
+let lastRemoved=null;
+async function removeTodo(id){
+  await updateJob(state.job.id,j=>{ const i=(j.todos||[]).findIndex(x=>x.id===id); if(i>=0) lastRemoved={jobId:j.id,item:j.todos.splice(i,1)[0],i}; });
+  renderTodos(); toast('To-do removed');
+}
+$('todoForm').onsubmit=async e=>{ e.preventDefault(); const v=$('todoIn').value; $('todoIn').value=''; await addTodo(v); };
+
+// Camera "Note": attaches to the last photo/video taken, or to the job notes if none yet.
+let noteTarget=null;
+function setNoteTodo(on){ $('noteTodo').setAttribute('aria-pressed',on?'true':'false'); }
+$('noteTodo').onclick=()=>setNoteTodo($('noteTodo').getAttribute('aria-pressed')!=='true');
+$('camNoteBtn').onclick=()=>{
+  $('noteText').value=''; $('noteTitle').textContent='Note'; setNoteTodo(false);
+  $('noteSheet').hidden=false; $('noteText').focus();   // focus right away so the keyboard (and its mic) opens
+  (async()=>{
+    noteTarget=null; let p=null;
+    if(state.lastId) p=await rq(store('photos').get(state.lastId)).catch(()=>null);
+    if(p&&p.jobId===state.job.id){ noteTarget=p.id; if(!$('noteText').value) $('noteText').value=p.note||''; }
+    $('noteTitle').textContent=noteTarget?(p.type==='video'?'Note for the last video':'Note for the last photo'):'Note for this job';
+  })();
+};
+async function closeNote(){
+  const text=$('noteText').value.trim(), asTodo=$('noteTodo').getAttribute('aria-pressed')==='true';
+  $('noteText').blur(); $('noteSheet').hidden=true;
+  const jobId=state.job&&state.job.id; if(!jobId) return;
+  const done=[];
+  if(noteTarget){
+    const p=await rq(store('photos').get(noteTarget)).catch(()=>null);
+    if(p&&(p.note||'')!==text){ p.note=text; if(p.driveId) p.noteDirty=true; await putPhoto(p); if(text) done.push('Note saved to the photo'); }
+  } else if(text){
+    await updateJob(jobId,j=>{ j.notes=(j.notes?j.notes.replace(/\s+$/,'')+'\n':'')+text; }); done.push('Added to job notes');
+  }
+  if(asTodo&&text){ await addTodo(text,jobId); done.push(done.length?'to-do list':'Added to to-do list'); }
+  if(done.length) toast(done.join(' and '));
+  runUploads();
+}
+$('noteDone').onclick=closeNote;
+$('noteX').onclick=closeNote;
+
+// Send changed photo notes to the matching file in Drive.
+async function syncNotes(){
+  try{
+    const dirty=(await rq(store('photos').getAll())).filter(p=>p.noteDirty&&p.driveId);
+    for(const p of dirty){
+      await callDrive({action:'note',id:p.driveId,note:p.note||''},30000);
+      const fresh=await rq(store('photos').get(p.id));
+      if(fresh&&(fresh.note||'')===(p.note||'')){ fresh.noteDirty=false; await putPhoto(fresh); }
+    }
+  }catch(e){}
+}
+
+function renderReport(){
+  const j=state.job, box=$('reportBox');
+  if(!j||!j.reportUrl){ box.hidden=true; return; }
+  box.hidden=false;
+  $('reportTxt').textContent=`Report made ${fmtDate(j.reportAt)}, ${fmtTime(j.reportAt)}`;
+  $('reportLink').href=j.reportUrl;
+}
+async function uploadsDone(){ while(sync.busy) await new Promise(r=>setTimeout(r,400)); await runUploads(); }
+$('reportBtn').onclick=async()=>{
+  if(!cfg.url||!cfg.key){ toast('Set up Google Drive backup first (gear on the Jobs screen).'); return; }
+  const btn=$('reportBtn'), lbl=$('reportLbl'); if(btn.disabled) return;
+  btn.disabled=true;
+  try{
+    await saveJobNotes();
+    lbl.textContent='Uploading…';
+    await uploadsDone();
+    const job=await rq(store('jobs').get(state.job.id));
+    const photos=(await jobPhotos(job.id)).sort((a,b)=>a.taken-b.taken);
+    const waiting=photos.filter(p=>!p.driveId&&!p.broken).length;
+    if(waiting){ toast(`${waiting} still uploading. Try again once they’re in Drive.`); return; }
+    lbl.textContent='Making report…';
+    const items=photos.filter(p=>p.driveId).map(p=>({id:p.driveId,type:p.type||'photo',note:p.note||'',when:`${fmtDate(p.taken)}, ${fmtTime(p.taken)}`}));
+    const r=await callDrive({action:'report',folder:await folderName(job),title:job.name,addr:job.addr||'',date:fmtDate(Date.now()),
+      notes:job.notes||'',todos:(job.todos||[]).map(t=>({text:t.text,done:!!t.done})),items,reportId:job.reportId||''},330000);
+    await updateJob(job.id,j=>{ j.reportId=r.id; j.reportUrl=r.url; j.reportAt=Date.now(); });
+    renderReport(); toast('Report ready in Google Drive');
+  }catch(e){
+    toast(/unknown action/.test(e.message)?'Update your Google script first, then try again.':e.message);
+  }finally{ btn.disabled=false; lbl.textContent='Make report'; }
+};
 
 /* ---------- boot ---------- */
 (async()=>{
