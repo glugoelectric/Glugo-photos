@@ -124,6 +124,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 
 /* Viewer */
 #viewer{background:#000;z-index:20}
+#pdfView{background:#2a2b30;z-index:40}
+#pdfView .bar{display:grid;grid-template-columns:44px 1fr 44px;background:var(--bg)}
+#pdfView .bar .btn{justify-self:center;min-width:150px;height:44px}
+#pdfPages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 10px calc(var(--safe-b) + 20px);display:flex;flex-direction:column;gap:12px;align-items:center}
+#pdfPages canvas{width:100%;max-width:820px;height:auto;background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+#pdfPages .empty{color:#ddd}
 #viewer .imgwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
 #viewer img{max-width:100%;max-height:100%;object-fit:contain}
 .navbtn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;display:grid;place-items:center;background:rgba(0,0,0,.35);border-radius:10px}
@@ -260,7 +266,7 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
       <button class="btn" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
       <button class="btn ghost" id="reportBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg><span id="reportLbl">Pro Report</span></button>
     </div>
-    <div class="reportbox" id="reportBox" hidden><span id="reportTxt"></span><div class="acts"><button class="btn" id="reportShare" type="button">Share PDF</button><a class="btn ghost" id="reportLink" href="#" target="_blank" rel="noopener">Open in Drive</a></div></div>
+    <div class="reportbox" id="reportBox" hidden><span id="reportTxt"></span><div class="acts"><button class="btn" id="reportView" type="button">View</button><button class="btn" id="reportShare" type="button">Share PDF</button><a class="btn ghost" id="reportLink" href="#" target="_blank" rel="noopener">Open in Drive</a></div></div>
     <section class="card">
       <h3>Job notes</h3>
       <textarea id="jobNotes" rows="3" placeholder="Scope, what the customer asked for, gate code… Tap the mic on the keyboard to talk."></textarea>
@@ -281,6 +287,16 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
     <button class="btn ghost" id="selReport">Report</button>
     <button class="btn" id="selShare">Share</button>
   </div>
+</section>
+
+<!-- PDF PREVIEW -->
+<section id="pdfView" class="view" hidden>
+  <header class="bar">
+    <button class="iconbtn close" id="pdfX" type="button" aria-label="Close preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="btn" id="pdfShare" type="button">Share PDF</button>
+    <span></span>
+  </header>
+  <div id="pdfPages"></div>
 </section>
 
 <!-- VIEWER -->
@@ -1164,7 +1180,7 @@ function renderReport(){
   box.hidden=false;
   $('reportTxt').textContent=`Pro Report made ${fmtDate(j.pdfAt)}, ${fmtTime(j.pdfAt)}`;
   $('reportLink').href=j.pdfUrl;
-  $('reportShare').hidden=!j.pdfLocal;
+  $('reportShare').hidden=!j.pdfLocal; $('reportView').hidden=!j.pdfLocal;
 }
 async function uploadsDone(){ while(sync.busy) await new Promise(r=>setTimeout(r,400)); await runUploads(); }
 const tog = (id,on) => { if(on!==undefined) $(id).setAttribute('aria-pressed',on?'true':'false'); return $(id).getAttribute('aria-pressed')==='true'; };
@@ -1220,11 +1236,52 @@ $('proForm').onsubmit=async e=>{
       local=true;
     }
     await updateJob(job.id,j=>{ j.pdfId=r.id; j.pdfUrl=r.url; j.pdfName=r.name; j.pdfAt=Date.now(); j.pdfLocal=local; });
-    renderReport(); toast(local?'PDF ready. Tap Share PDF to send it.':'PDF ready in Google Drive.',4000);
+    renderReport();
+    if(local) showPdf(); else toast('PDF ready in Google Drive.',4000);
   }catch(e){
     toast(/unknown action/.test(e.message)?'Update your Google script first, then try again.':e.message,8000);
   }finally{ btn.disabled=false; lbl.textContent='Pro Report'; }
 };
+// In-app PDF preview (pages drawn with Mozilla's PDF.js, loaded the first time it's needed)
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsReady=null;
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(!pdfjsReady) pdfjsReady=new Promise((res,rej)=>{
+    const sc=document.createElement('script'); sc.src=PDFJS+'pdf.min.js';
+    sc.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'; res(); };
+    sc.onerror=()=>{ pdfjsReady=null; rej(new Error('The preview needs a signal the first time. Use Share PDF for now.')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsReady;
+}
+let pdfRun=0;
+async function showPdf(){
+  const j=state.job; const run=++pdfRun;
+  const m=await rq(store('media').get(PDF_KEY(j.id))).catch(()=>null);
+  if(!m){ toast('Open it in Drive to view.',4000); return; }
+  const box=$('pdfPages'); box.innerHTML='<div class="empty">Loading preview…</div>';
+  $('pdfView').hidden=false;
+  try{
+    await loadPdfJs();
+    const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(m.buf.slice(0))}).promise;
+    if(run!==pdfRun) return;
+    box.textContent='';
+    const w=Math.min(box.clientWidth-20,820), dpr=Math.min(window.devicePixelRatio||1,3);
+    for(let n=1;n<=pdf.numPages;n++){
+      const page=await pdf.getPage(n); if(run!==pdfRun) return;
+      const base=page.getViewport({scale:1}); const vp=page.getViewport({scale:(w*dpr)/base.width});
+      const c=document.createElement('canvas'); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+      c.setAttribute('aria-label','Page '+n);
+      box.append(c);
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    }
+  }catch(e){ if(run===pdfRun) box.innerHTML='<div class="empty"></div>', box.firstChild.textContent=e.message||'Couldn’t show the preview. Use Share PDF.'; }
+}
+$('reportView').onclick=showPdf;
+$('pdfX').onclick=()=>{ pdfRun++; $('pdfView').hidden=true; $('pdfPages').textContent=''; };
+$('pdfShare').onclick=()=>$('reportShare').onclick();
+
 $('reportShare').onclick=async()=>{
   const j=state.job;
   const m=await rq(store('media').get(PDF_KEY(j.id))).catch(()=>null);
