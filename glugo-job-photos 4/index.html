@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GLugo Job Photos</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Job Photos">
+<meta name="theme-color" content="#121214">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* Layout: one-screen app, three views (Jobs → Camera → Job gallery). Dark shop look with GLugo yellow. */
+:root{
+  --bg:#121214; --panel:#1c1d21; --panel2:#25262b; --line:#33353c;
+  --fg:#f3f2ec; --muted:#9c9ea6; --accent:#f5c518; --accent-ink:#151515;
+  --danger:#ff5d52; --ok:#5fd18b;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-num:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--font);overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.view{position:fixed;inset:0;display:flex;flex-direction:column}
+
+/* Top bar */
+.bar{display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 16px 10px;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar h1 small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.iconbtn{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;flex:none}
+.iconbtn:active{background:var(--panel2)}
+.iconbtn svg{width:22px;height:22px}
+.txtbtn{padding:8px 12px;border-radius:10px;font-weight:600;color:var(--accent);flex:none}
+.txtbtn:active{background:var(--panel2)}
+
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(var(--safe-b) + 110px)}
+
+/* Jobs */
+.joblist{display:flex;flex-direction:column;gap:10px}
+.job{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:var(--panel);text-align:left;width:100%}
+.job:active{background:var(--panel2)}
+.job .th{width:58px;height:58px;border-radius:10px;background:var(--panel2) center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--muted)}
+.job .meta{flex:1;min-width:0}
+.job .name{font-weight:650;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .count{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);text-align:right;flex:none}
+.job .count b{display:block;color:var(--fg);font-size:17px;font-family:var(--font)}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(245,197,24,.14);color:var(--accent);margin-top:3px}
+.pill.ok{background:rgba(95,209,139,.13);color:var(--ok)}
+.empty{color:var(--muted);text-align:center;padding:48px 20px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.empty strong{color:var(--fg);font-size:17px}
+.storage{margin-top:18px;color:var(--muted);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+
+.fab{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-b) + 16px);height:56px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font-weight:750;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.fab:active{transform:scale(.98)}
+.fab svg{width:22px;height:22px}
+
+/* Camera */
+#camera{background:#000}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.camtop{position:absolute;left:0;right:0;top:0;padding:calc(var(--safe-t) + 8px) 12px 18px;display:flex;align-items:center;gap:8px;background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,0))}
+.camtop .jobname{flex:1;min-width:0;text-align:center;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px #000}
+.camtop .iconbtn{background:rgba(0,0,0,.35)}
+.camtop .iconbtn.on{background:var(--accent);color:var(--accent-ink)}
+.chip{font-size:12px;font-weight:700;padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.45);letter-spacing:.03em;flex:none}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.cambottom{position:absolute;left:0;right:0;bottom:0;padding:22px 24px calc(var(--safe-b) + 22px);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.7))}
+.lastthumb{width:56px;height:56px;border-radius:12px;border:2px solid rgba(255,255,255,.85);background:#222 center/cover no-repeat;justify-self:start;position:relative}
+.lastthumb .n{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:800;display:grid;place-items:center;padding:0 5px;font-variant-numeric:tabular-nums}
+.shutter{width:80px;height:80px;border-radius:50%;border:5px solid #fff;padding:4px;background:transparent}
+.shutter i{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:transform .08s}
+.shutter:active i{transform:scale(.88);background:var(--accent)}
+.camhint{justify-self:end;color:#ddd;font-size:12px;text-align:right;max-width:90px;line-height:1.25}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.go{animation:fl .22s ease-out}
+@keyframes fl{0%{opacity:.75}100%{opacity:0}}
+.modes{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 128px);display:flex;justify-content:center;gap:6px}
+.modes button{font-size:13px;font-weight:750;letter-spacing:.08em;padding:7px 14px;border-radius:999px;color:#ddd;background:rgba(0,0,0,.35)}
+.modes button.on{background:var(--accent);color:var(--accent-ink)}
+.lenses{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 176px);display:flex;justify-content:center;gap:12px}
+.lenses button{width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-weight:750;font-size:13px;border:1.5px solid rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
+.lenses button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.shutter.vid i{background:#ff3b30}
+.shutter.rec i{transform:scale(.5);border-radius:8px;background:#ff3b30}
+.shutter.vid:active i{background:#ff3b30}
+.rectimer{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--safe-t) + 64px);background:rgba(0,0,0,.6);padding:6px 12px;border-radius:999px;font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:15px;display:flex;gap:8px;align-items:center}
+.rectimer i{width:10px;height:10px;border-radius:50%;background:#ff3b30;animation:pulse .8s infinite alternate}
+.cell .vbadge{position:absolute;left:5px;top:5px;display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.6);border-radius:5px;padding:2px 5px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.cell .vbadge svg{width:10px;height:10px}
+#vVid{max-width:100%;max-height:100%;background:#000}
+.camerr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;color:var(--muted)}
+.camerr strong{color:var(--fg);font-size:18px}
+.btn{height:48px;padding:0 20px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.ghost{background:var(--panel2);color:var(--fg)}
+.btn.danger{background:var(--danger);color:#fff}
+
+/* Gallery */
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.actions .btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;gap:8px;height:46px}
+.actions .btn svg{width:19px;height:19px}
+.daylabel{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px}
+.cell{position:relative;aspect-ratio:1;max-width:100%;background:var(--panel2) center/cover no-repeat;border-radius:6px;overflow:hidden}
+.cell .dot{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px rgba(0,0,0,.5)}
+.cell .note{position:absolute;left:5px;bottom:5px;width:18px;height:18px;border-radius:5px;background:rgba(0,0,0,.6);display:grid;place-items:center}
+.cell .note svg{width:12px;height:12px}
+.cell .sel{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.3)}
+.cell.picked{outline:3px solid var(--accent);outline-offset:-3px}
+.cell.picked .sel{background:var(--accent);border-color:var(--accent)}
+.cell.picked .sel::after{content:"";position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.legend{color:var(--muted);font-size:12px;margin-top:14px;display:flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block}
+.selbar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(var(--safe-b) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.selbar .count{flex:1;font-weight:650}
+.selbar .btn{height:44px}
+
+/* Viewer */
+#viewer{background:#000;z-index:20}
+#viewer .imgwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+.navbtn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;display:grid;place-items:center;background:rgba(0,0,0,.35);border-radius:10px}
+.navbtn svg{width:24px;height:24px}
+.navbtn.prev{left:6px}.navbtn.next{right:6px}
+.vpanel{background:var(--panel);padding:12px 16px calc(var(--safe-b) + 12px);display:flex;flex-direction:column;gap:10px}
+.vmeta{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:16px/1.35 var(--font);padding:11px 12px;resize:none}
+.vrow{display:flex;gap:10px}
+.vrow .btn{flex:1;height:46px}
+
+/* Sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end}
+.sheet{width:100%;background:var(--panel);border-radius:20px 20px 0 0;padding:20px 16px calc(var(--safe-b) + 16px);display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto}
+.sheet h2{margin:0;font-size:19px}
+.sheet p{margin:0;color:var(--muted)}
+.sheet label{font-size:13px;color:var(--muted);font-weight:600;display:flex;flex-direction:column;gap:6px}
+.sheet .row{display:flex;gap:10px}
+.sheet .row .btn{flex:1}
+
+.sync{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:var(--panel);margin-bottom:14px;font-size:14px;text-align:left;width:100%}
+.sync i{width:10px;height:10px;border-radius:50%;flex:none;background:var(--muted)}
+.sync.ok i{background:var(--ok)} .sync.busy i{background:var(--accent);animation:pulse 1s infinite alternate} .sync.warn i{background:var(--accent)} .sync.err i{background:var(--danger)}
+.sync span{flex:1;min-width:0}
+.sync b{color:var(--accent);font-weight:650;flex:none}
+@keyframes pulse{to{opacity:.3}}
+select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:16px var(--font);padding:11px 12px;-webkit-appearance:none}
+.sheet .hint{font-size:13px}
+.drivelink{color:var(--accent);font-weight:600;text-decoration:none;text-align:center;padding:4px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 92px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+@media (prefers-reduced-motion:reduce){.rectimer i{animation:none}.sync.busy i{animation:none}.flash.go{animation:none}.shutter i{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- JOBS -->
+<section id="jobs" class="view">
+  <header class="bar">
+    <div class="brand"><div class="mark">GL</div><h1>Job Photos<small>GLugo Electric</small></h1></div>
+    <button class="iconbtn" id="setBtn" aria-label="Google Drive settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button>
+  </header>
+  <div class="scroll">
+    <button class="sync" id="sync" type="button"><i></i><span id="syncTxt">Checking backup…</span><b id="syncAct"></b></button>
+    <div id="joblist" class="joblist"></div>
+    <div id="jobsEmpty" class="empty" hidden>
+      <strong>No jobs yet</strong>
+      <span>Start a job, then every shutter tap saves a photo to it. Nothing goes to your iPhone Photos.</span>
+    </div>
+    <div id="storage" class="storage"></div>
+  </div>
+  <button class="fab" id="newJobBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New job</button>
+</section>
+
+<!-- CAMERA -->
+<section id="camera" class="view" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="flash" id="flash"></div>
+  <div class="camerr" id="camErr" hidden>
+    <strong>Camera is off</strong>
+    <span id="camErrMsg">Allow camera access for this app, then try again.</span>
+    <button class="btn" id="camRetry">Try again</button>
+    <button class="btn ghost" id="camFallback">Use iPhone camera instead</button>
+    <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+  </div>
+  <div class="camtop">
+    <button class="iconbtn" id="camBack" aria-label="Back to jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="jobname" id="camJob"></div>
+    <button class="chip on" id="stampBtn" aria-pressed="true">DATE STAMP</button>
+    <button class="iconbtn" id="torchBtn" aria-label="Flashlight" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
+  </div>
+  <div class="rectimer" id="recTimer" hidden><i></i><span id="recTime">0:00</span><span style="color:#aaa">/ 3:00</span></div>
+  <div class="lenses" id="lenses" hidden></div>
+  <div class="modes" id="modes">
+    <button id="modePhoto" class="on" aria-pressed="true">PHOTO</button>
+    <button id="modeVideo" aria-pressed="false">VIDEO</button>
+  </div>
+  <div class="cambottom">
+    <button class="lastthumb" id="lastThumb" aria-label="Open job photos"><span class="n" id="camCount">0</span></button>
+    <button class="shutter" id="shutter" aria-label="Take photo"><i></i></button>
+    <div class="camhint" id="camHint">Each tap saves. No confirm.</div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section id="gallery" class="view" hidden>
+  <header class="bar">
+    <button class="iconbtn" id="galBack" aria-label="Back to jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="galTitle"></h1>
+    <button class="txtbtn" id="selectBtn">Select</button>
+  </header>
+  <div class="scroll">
+    <button class="sync" id="galSync" type="button"><i></i><span id="galSyncTxt"></span><b id="galSyncAct"></b></button>
+    <div class="actions">
+      <button class="btn" id="moreShotsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take more</button>
+    </div>
+    <div id="galGrid"></div>
+    <div id="galEmpty" class="empty" hidden><strong>No photos yet</strong><span>Tap Take more to open the camera.</span></div>
+    <div class="legend" id="legend"><i></i> Backed up to Google Drive</div>
+    <div class="storage"><button class="txtbtn" id="editJobBtn" style="color:var(--muted)">Edit or delete job</button></div>
+  </div>
+  <div class="selbar" id="selBar" hidden>
+    <span class="count" id="selCount">0 selected</span>
+    <button class="btn ghost" id="selDelete">Delete</button>
+    <button class="btn" id="selShare">Share</button>
+  </div>
+</section>
+
+<!-- VIEWER -->
+<section id="viewer" class="view" hidden>
+  <header class="bar" style="background:#000;border-color:#222">
+    <button class="iconbtn" id="vClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h1 id="vTitle" style="font-size:16px"></h1>
+  </header>
+  <div class="imgwrap">
+    <img id="vImg" alt="Job photo">
+    <video id="vVid" controls playsinline hidden></video>
+    <button class="navbtn prev" id="vPrev" aria-label="Previous photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="navbtn next" id="vNext" aria-label="Next photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="vpanel">
+    <div class="vmeta"><span id="vDate"></span><span id="vStatus"></span></div>
+    <textarea id="vNote" rows="2" placeholder="Add a note (e.g. main panel, before)"></textarea>
+    <div class="vrow">
+      <button class="btn ghost" id="vDelete">Delete</button>
+      <button class="btn" id="vShare">Share</button>
+    </div>
+    <a class="drivelink" id="vDrive" href="#" target="_blank" rel="noopener" hidden>Open in Google Drive</a>
+  </div>
+</section>
+
+<!-- SHEETS -->
+<div class="scrim" id="jobSheet" hidden>
+  <form class="sheet" id="jobForm">
+    <h2 id="jobSheetTitle">New job</h2>
+    <label>Customer or job name<input type="text" id="jobName" placeholder="Smith – panel upgrade" required autocomplete="off"></label>
+    <label>Address or city (optional)<input type="text" id="jobAddr" placeholder="1234 Elm St, San Jose" autocomplete="off"></label>
+    <div class="row">
+      <button type="button" class="btn ghost" id="jobCancel">Cancel</button>
+      <button type="submit" class="btn" id="jobSave">Start shooting</button>
+    </div>
+    <button type="button" class="btn danger" id="jobDelete" hidden>Delete job and all its photos</button>
+  </form>
+</div>
+
+<div class="scrim" id="setSheet" hidden>
+  <form class="sheet" id="setForm">
+    <h2>Google Drive backup</h2>
+    <p class="hint">Paste the Web app link and key from your Google Apps Script. Every photo uploads to the “GLugo Job Photos” folder in your Drive, one folder per job.</p>
+    <label>Web app link<input type="url" id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label>Key<input type="text" id="setKey" placeholder="glugo-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label>Keep photos on this phone<select id="setKeep"><option value="0">Always</option><option value="30">30 days after backup</option><option value="7">7 days after backup</option></select></label>
+    <p class="hint">Photos removed from the phone stay in Drive. The app keeps a small preview and a link to each one.</p>
+    <div class="row">
+      <button type="button" class="btn ghost" id="setTest">Test link</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+    <button type="button" class="btn ghost" id="setClose">Close</button>
+  </form>
+</div>
+
+<div class="scrim" id="confirmSheet" hidden>
+  <div class="sheet">
+    <h2 id="cTitle"></h2>
+    <p id="cMsg"></p>
+    <div class="row">
+      <button class="btn ghost" id="cNo">Cancel</button>
+      <button class="btn danger" id="cYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<canvas id="cv" hidden></canvas>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const state = { mode:'photo', job:null, photos:[], selecting:false, picked:new Set(), viewIdx:-1, stamp:true, urls:[] };
+let db, stream=null, track=null, torchOn=false;
+
+try { state.stamp = localStorage.getItem('stamp') !== '0'; } catch(e) {}
+const cfg = { url:'', key:'', keep:0 };
+try { cfg.url=localStorage.getItem('gjp.url')||''; cfg.key=localStorage.getItem('gjp.key')||''; cfg.keep=Number(localStorage.getItem('gjp.keep')||0); } catch(e) {}
+const sync = { busy:false, err:'', left:0 };
+
+/* ---------- storage ---------- */
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('glugo-job-photos',3);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if(!d.objectStoreNames.contains('jobs')) d.createObjectStore('jobs',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('photos')){ const p = d.createObjectStore('photos',{keyPath:'id',autoIncrement:true}); p.createIndex('jobId','jobId'); }
+      if(!d.objectStoreNames.contains('recparts')){ const c = d.createObjectStore('recparts',{keyPath:'id',autoIncrement:true}); c.createIndex('recId','recId'); }
+      if(!d.objectStoreNames.contains('media')) d.createObjectStore('media',{keyPath:'id'});
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const store = (n,m='readonly') => db.transaction(n,m).objectStore(n);
+const rq = r => new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+const allJobs = () => rq(store('jobs').getAll());
+const putJob = j => rq(store('jobs','readwrite').put(j));
+const jobPhotos = id => rq(store('photos').index('jobId').getAll(id));
+const countPhotos = id => rq(store('photos').index('jobId').count(id));
+function latestPhoto(id){
+  return new Promise(res=>{
+    const r = store('photos').index('jobId').openCursor(IDBKeyRange.only(id),'prev');
+    r.onsuccess = () => res(r.result ? r.result.value : null);
+    r.onerror = () => res(null);
+  });
+}
+// Photo/video records hold only small details. The file itself is stored once, as raw bytes,
+// in the 'media' store. (Safari has a bug when saving Blob objects again after reading them back.)
+const putPhoto = p => rq(store('photos','readwrite').put(p));
+function deletePhotos(ids){
+  return new Promise((res,rej)=>{
+    const t = db.transaction(['photos','media'],'readwrite');
+    ids.forEach(id=>{ t.objectStore('photos').delete(id); t.objectStore('media').delete(id); });
+    t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+  });
+}
+function addItem(meta,buf){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(['photos','media'],'readwrite');
+    Object.assign(meta,{hasMedia:true,size:buf.byteLength});
+    const r=t.objectStore('photos').add(meta);
+    r.onsuccess=()=>{ meta.id=r.result; t.objectStore('media').put({id:r.result,buf,mime:meta.mime}); };
+    t.oncomplete=()=>res(meta); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('Save cancelled'));
+  });
+}
+async function getMedia(p){
+  if(!p.hasMedia) return null;
+  const m=await rq(store('media').get(p.id));
+  return m?new Blob([m.buf],{type:m.mime||p.mime||'image/jpeg'}):null;
+}
+function dropMedia(p){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(['photos','media'],'readwrite');
+    t.objectStore('media').delete(p.id); p.hasMedia=false; t.objectStore('photos').put(p);
+    t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+  });
+}
+const thumbUrl = p => p&&p.thumbBuf ? url(new Blob([p.thumbBuf],{type:'image/jpeg'})) : '';
+const bufOf = b => b.arrayBuffer ? b.arrayBuffer() : new Response(b).arrayBuffer();
+// Move files saved by the earlier version of the app into the new storage.
+async function migrate(){
+  const all=await rq(store('photos').getAll());
+  for(const p of all){
+    if(!('blob' in p)&&!('thumb' in p)) continue;
+    try{ if(p.thumb) p.thumbBuf=await bufOf(p.thumb); }catch(e){}
+    p.mime=p.mime||'image/jpeg';
+    try{
+      if(p.blob){ const buf=await bufOf(p.blob); await rq(store('media','readwrite').put({id:p.id,buf,mime:p.mime})); p.hasMedia=true; p.size=buf.byteLength; }
+      else p.hasMedia=false;
+    }catch(e){ p.hasMedia=false; if(!p.driveId) p.broken=true; }
+    delete p.blob; delete p.thumb; delete p.up; delete p.exported;
+    await putPhoto(p);
+  }
+}
+
+/* ---------- helpers ---------- */
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.hidden=false;
+  clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2400);
+}
+function show(id){ ['jobs','camera','gallery'].forEach(v=>$(v).hidden = v!==id); }
+function url(blob){ const u=URL.createObjectURL(blob); state.urls.push(u); return u; }
+function freeUrls(){ state.urls.forEach(u=>URL.revokeObjectURL(u)); state.urls=[]; }
+const fmtDate = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+const fmtTime = t => new Date(t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+const pad = n => String(n).padStart(2,'0');
+function fileName(job,p){
+  const d=new Date(p.taken);
+  const slug=(job.name||'job').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'job';
+  return `${slug}_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${p.id}.${p.type==='video'?(String(p.mime).includes('webm')?'webm':'mp4'):'jpg'}`;
+}
+function confirmSheet(title,msg,yes='Delete',safe=false){
+  return new Promise(res=>{
+    $('cTitle').textContent=title; $('cMsg').textContent=msg; $('cYes').textContent=yes;
+    $('cYes').className=safe?'btn':'btn danger';
+    $('confirmSheet').hidden=false;
+    const done=v=>{ $('confirmSheet').hidden=true; $('cYes').onclick=$('cNo').onclick=null; res(v); };
+    $('cYes').onclick=()=>done(true); $('cNo').onclick=()=>done(false);
+  });
+}
+
+/* ---------- jobs view ---------- */
+async function renderJobs(){
+  freeUrls();
+  const jobs=(await allJobs()).sort((a,b)=>b.updated-a.updated);
+  const list=$('joblist'); list.textContent='';
+  $('jobsEmpty').hidden = jobs.length>0;
+  for(const j of jobs){
+    const [n,last,photos]=await Promise.all([countPhotos(j.id),latestPhoto(j.id),jobPhotos(j.id)]);
+    const unsaved=photos.filter(p=>!p.driveId&&!p.broken).length;
+    const b=document.createElement('button'); b.className='job';
+    const th=document.createElement('div'); th.className='th';
+    if(last&&last.thumbBuf) th.style.backgroundImage=`url(${thumbUrl(last)})`;
+    else th.innerHTML='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+    const meta=document.createElement('div'); meta.className='meta';
+    const nm=document.createElement('div'); nm.className='name'; nm.textContent=j.name;
+    const sb=document.createElement('div'); sb.className='sub'; sb.textContent=(j.addr?j.addr+' · ':'')+fmtDate(j.updated);
+    meta.append(nm,sb);
+    if(n){ const pl=document.createElement('span'); pl.className='pill'+(unsaved?'':' ok'); pl.textContent=unsaved?`${unsaved} waiting for Drive`:'All in Drive'; meta.append(pl); }
+    const ct=document.createElement('div'); ct.className='count'; ct.innerHTML=`<b>${n}</b>files`;
+    b.append(th,meta,ct);
+    b.onclick=()=>openGallery(j);
+    list.append(b);
+  }
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const e=await navigator.storage.estimate();
+      $('storage').textContent=`Using ${(e.usage/1048576).toFixed(0)} MB on this iPhone`;
+    }
+  }catch(e){}
+}
+
+function openJobSheet(job){
+  $('jobSheetTitle').textContent = job?'Edit job':'New job';
+  $('jobSave').textContent = job?'Save':'Start shooting';
+  $('jobName').value = job?job.name:''; $('jobAddr').value = job?(job.addr||''):'';
+  $('jobDelete').hidden = !job;
+  $('jobSheet').dataset.edit = job?job.id:'';
+  $('jobSheet').hidden=false;
+  setTimeout(()=>$('jobName').focus(),50);
+}
+$('newJobBtn').onclick=()=>openJobSheet(null);
+$('jobCancel').onclick=()=>$('jobSheet').hidden=true;
+$('jobForm').onsubmit=async e=>{
+  e.preventDefault();
+  const name=$('jobName').value.trim(); if(!name) return;
+  const editId=$('jobSheet').dataset.edit;
+  $('jobSheet').hidden=true;
+  if(editId){
+    state.job.name=name; state.job.addr=$('jobAddr').value.trim();
+    await putJob(state.job); $('galTitle').textContent=name; toast('Job saved');
+  } else {
+    const j={id:'j'+Date.now().toString(36),name,addr:$('jobAddr').value.trim(),created:Date.now(),updated:Date.now()};
+    await putJob(j); openCamera(j);
+  }
+};
+$('jobDelete').onclick=async()=>{
+  $('jobSheet').hidden=true;
+  const n=state.photos.length;
+  const unsaved=state.photos.filter(p=>!p.driveId).length;
+  const ok=await confirmSheet(`Delete “${state.job.name}”?`, `${n} photo${n===1?'':'s'} will be removed from this app. Copies already in Google Drive stay there.`+(unsaved?` ${unsaved} haven’t uploaded yet and will be lost.`:''),'Delete job');
+  if(!ok) return;
+  await deletePhotos(state.photos.map(p=>p.id));
+  await rq(store('jobs','readwrite').delete(state.job.id));
+  toast('Job deleted'); goJobs();
+};
+function goJobs(){ stopCamera(); exitSelect(); show('jobs'); renderJobs(); }
+
+/* ---------- camera ---------- */
+async function openCamera(job){
+  state.job=job; freeUrls();
+  $('camJob').textContent=job.name;
+  const last=await latestPhoto(job.id);
+  $('lastThumb').style.backgroundImage = last&&last.thumbBuf?`url(${thumbUrl(last)})`:'none';
+  $('camCount').textContent=await countPhotos(job.id);
+  updStamp();
+  show('camera'); startCamera();
+}
+async function startCamera(again){
+  $('camErr').hidden=true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camError('This browser can’t open the live camera. Open the app from your Home Screen in Safari.'); return; }
+  try{
+    stopCamera();
+    const vid = state.mode==='video'
+      ? {facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}
+      : {facingMode:{ideal:'environment'},width:{ideal:4032},height:{ideal:3024}};
+    const open=async v=>{
+      if(state.mode==='video'){
+        try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:v}); }
+        catch(err){
+          if(err&&err.name==='NotAllowedError'){ const s2=await navigator.mediaDevices.getUserMedia({audio:false,video:v}); toast('Microphone is blocked, so videos will have no sound'); return s2; }
+          throw err;
+        }
+      }
+      return navigator.mediaDevices.getUserMedia({audio:false,video:v});
+    };
+    const id=lens.ids[lens.want];
+    if(id){
+      const v2=Object.assign({},vid,{deviceId:{exact:id}}); delete v2.facingMode;
+      try{ stream=await open(v2); }
+      catch(err){ if(err&&err.name==='NotAllowedError') throw err; lens.ids={}; stream=await open(vid); }
+    } else stream=await open(vid);
+    const v=$('video'); v.srcObject=stream; await v.play().catch(()=>{});
+    track=stream.getVideoTracks()[0];
+    await findLenses();
+    const sid=track.getSettings?track.getSettings().deviceId:null;
+    lens.cur=Object.keys(lens.ids).find(k=>lens.ids[k]===sid)||'1';
+    // First time on this phone: the lens list only shows up after access is allowed, so switch once if needed.
+    if(!again&&lens.want!==lens.cur&&lens.ids[lens.want]) return startCamera(true);
+    renderLenses();
+    const caps=track.getCapabilities?track.getCapabilities():{};
+    $('torchBtn').hidden=!caps.torch; torchOn=false; $('torchBtn').classList.remove('on');
+  }catch(e){
+    camError(e&&e.name==='NotAllowedError'?'Camera access was blocked. In Settings → Safari → Camera, choose Allow or Ask, then try again.':'Couldn’t start the camera. Close other camera apps and try again.');
+  }
+}
+function camError(msg){ $('camErrMsg').textContent=msg; $('camErr').hidden=false; }
+function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); } stream=null; track=null; }
+$('camRetry').onclick=startCamera;
+$('camFallback').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const img=new Image(); img.src=URL.createObjectURL(f); await img.decode().catch(()=>{});
+  const c=$('cv'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0);
+  URL.revokeObjectURL(img.src); await saveFromCanvas(c);
+};
+$('camBack').onclick=async()=>{ await stopRecording(); goJobs(); };
+$('lastThumb').onclick=async()=>{ await stopRecording(); stopCamera(); openGallery(state.job); };
+
+/* ---------- lenses (0.5× ultra wide / 1× / telephoto) ---------- */
+const lens={ want:'1', cur:'1', ids:{} };
+try{ lens.want=localStorage.getItem('gjp.lens')||'1'; lens.ids=JSON.parse(localStorage.getItem('gjp.lensIds')||'{}'); }catch(e){}
+// iPhone Safari lists each back camera by name once camera access is allowed.
+async function findLenses(){
+  try{
+    const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.label);
+    const ids={};
+    for(const d of devs){
+      const l=d.label.toLowerCase();
+      if(l.includes('front')||l.includes('dual')||l.includes('triple')) continue;
+      if(l.includes('ultra wide')) ids['0.5']=d.deviceId;
+      else if(l.includes('telephoto')) ids.tele=d.deviceId;
+      else if(l.includes('back')) ids['1']=d.deviceId;
+    }
+    if(ids['1']||ids['0.5']){ lens.ids=ids; try{ localStorage.setItem('gjp.lensIds',JSON.stringify(ids)); }catch(e){} }
+  }catch(e){}
+}
+function renderLenses(){
+  const box=$('lenses'); box.textContent='';
+  const opts=[['0.5','0.5×'],['1','1×'],['tele','Zoom']].filter(([k])=>lens.ids[k]);
+  box.hidden=opts.length<2||!!rec;
+  for(const [k,label] of opts){
+    const b=document.createElement('button'); b.type='button'; b.textContent=label;
+    b.className=k===lens.cur?'on':''; b.setAttribute('aria-pressed',k===lens.cur);
+    b.setAttribute('aria-label',k==='0.5'?'Wide angle 0.5x':k==='1'?'Normal 1x':'Zoom lens');
+    b.onclick=()=>setLens(k); box.append(b);
+  }
+}
+function setLens(k){
+  if(rec||k===lens.cur) return;
+  lens.want=k; try{ localStorage.setItem('gjp.lens',k); }catch(e){}
+  startCamera();
+}
+
+/* ---------- video ---------- */
+const MAX_SEC=180;
+let rec=null, recId=null, recSeq=0, recStart=0, recTimerId=null, recWrites=[], recDone=null;
+function setMode(m){
+  if(rec||state.mode===m) return;
+  state.mode=m;
+  $('modePhoto').classList.toggle('on',m==='photo'); $('modePhoto').setAttribute('aria-pressed',m==='photo');
+  $('modeVideo').classList.toggle('on',m==='video'); $('modeVideo').setAttribute('aria-pressed',m==='video');
+  $('shutter').classList.toggle('vid',m==='video');
+  $('stampBtn').hidden=m==='video';
+  $('camHint').textContent=m==='video'?'Tap to start, tap to stop. Up to 3 min.':'Each tap saves. No confirm.';
+  $('shutter').setAttribute('aria-label',m==='video'?'Start recording':'Take photo');
+  startCamera();
+}
+$('modePhoto').onclick=()=>setMode('photo');
+$('modeVideo').onclick=()=>setMode('video');
+function pickMime(){
+  if(!window.MediaRecorder) return null;
+  for(const m of ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']){
+    try{ if(MediaRecorder.isTypeSupported(m)) return m; }catch(e){}
+  }
+  return '';
+}
+const fmtDur = sec => `${Math.floor(sec/60)}:${pad(Math.floor(sec%60))}`;
+async function grabThumb(){
+  const v=$('video'); const c=document.createElement('canvas');
+  const s=240/Math.min(v.videoWidth,v.videoHeight); c.width=Math.round(v.videoWidth*s); c.height=Math.round(v.videoHeight*s);
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  return blobOf(c,0.75);
+}
+async function startRecording(){
+  const v=$('video'); if(!stream||!v.videoWidth) return;
+  const mime=pickMime();
+  if(mime===null){ toast('Video recording needs iOS 14.3 or newer'); return; }
+  try{ rec=new MediaRecorder(stream, mime?{mimeType:mime,videoBitsPerSecond:3500000}:{videoBitsPerSecond:3500000}); }
+  catch(e){ try{ rec=new MediaRecorder(stream); }catch(e2){ toast('This phone can’t record video here'); rec=null; return; } }
+  recId='r'+Date.now().toString(36); recSeq=0; recStart=Date.now(); recWrites=[];
+  const type=(rec.mimeType||mime||'video/mp4').split(';')[0];
+  const tb=await grabThumb(); const thumbBuf=tb?await bufOf(tb):null;
+  // Save the recording's details first so it can be recovered if the app is closed mid-recording.
+  await rq(store('recparts','readwrite').add({recId,seq:-1,jobId:state.job.id,mime:type,started:recStart,thumbBuf}));
+  const myRec=recId;
+  rec.ondataavailable=e=>{
+    if(e.data&&e.data.size){ const seq=recSeq++; recWrites.push(bufOf(e.data).then(buf=>rq(store('recparts','readwrite').add({recId:myRec,seq,buf}))).catch(()=>{})); }
+  };
+  const myId=recId;
+  recDone=new Promise(res=>{ rec.onstop=async()=>{ await Promise.all(recWrites); await finishRecording(myId); res(); }; });
+  rec.start(1000);
+  $('shutter').classList.add('rec'); $('shutter').setAttribute('aria-label','Stop recording');
+  $('modes').hidden=true; $('lenses').hidden=true; $('recTimer').hidden=false; $('recTime').textContent='0:00';
+  recTimerId=setInterval(()=>{
+    const sec=(Date.now()-recStart)/1000; $('recTime').textContent=fmtDur(sec);
+    if(sec>=MAX_SEC){ toast('3-minute limit reached. Video saved.'); stopRecording(); }
+  },250);
+}
+async function stopRecording(){
+  if(!rec) return;
+  const r=rec, done=recDone; rec=null;
+  clearInterval(recTimerId);
+  $('shutter').classList.remove('rec'); $('shutter').setAttribute('aria-label','Start recording');
+  $('modes').hidden=false; $('recTimer').hidden=true; renderLenses();
+  try{ if(r.state!=='inactive'){ r.requestData&&r.requestData(); r.stop(); } }catch(e){}
+  await done;
+}
+// Put the saved pieces of a recording together into one video file.
+async function finishRecording(id){
+  const parts=(await rq(store('recparts').index('recId').getAll(id))).sort((a,b)=>a.seq-b.seq);
+  const meta=parts.find(x=>x.seq===-1); const pieces=parts.filter(x=>x.seq>=0).map(x=>x.buf||x.blob).filter(Boolean);
+  if(meta&&pieces.length){
+    const buf=await bufOf(new Blob(pieces,{type:meta.mime}));
+    const dur=Math.max(1,Math.round((Date.now()-meta.started)/1000));
+    await addItem({jobId:meta.jobId,type:'video',mime:meta.mime,thumbBuf:meta.thumbBuf||null,taken:meta.started,duration:meta.recovered?null:dur,note:''},buf);
+    const j=await rq(store('jobs').get(meta.jobId)); if(j){ j.updated=Date.now(); await putJob(j); }
+    if(state.job&&state.job.id===meta.jobId&&!$('camera').hidden){
+      if(meta.thumbBuf) $('lastThumb').style.backgroundImage=`url(${url(new Blob([meta.thumbBuf],{type:'image/jpeg'}))})`;
+      $('camCount').textContent=Number($('camCount').textContent)+1;
+    }
+  }
+  await new Promise(res=>{ const t=db.transaction('recparts','readwrite'); parts.forEach(x=>t.objectStore('recparts').delete(x.id)); t.oncomplete=res; t.onerror=res; });
+  if(meta&&pieces.length){ toast(`Video saved (${fmtDur((Date.now()-meta.started)/1000)})`); runUploads(); }
+}
+// If the app was closed while recording, save whatever was captured.
+async function recoverRecordings(){
+  const all=await rq(store('recparts').getAll());
+  const ids=[...new Set(all.map(x=>x.recId))].filter(id=>id!==recId);
+  for(const id of ids){ const m=all.find(x=>x.recId===id&&x.seq===-1); if(m){ m.recovered=true; await rq(store('recparts','readwrite').put(m)); } await finishRecording(id); }
+  if(ids.length) toast('Recovered a video that was cut off');
+}
+$('torchBtn').onclick=async()=>{
+  if(!track) return;
+  try{ torchOn=!torchOn; await track.applyConstraints({advanced:[{torch:torchOn}]}); $('torchBtn').classList.toggle('on',torchOn); }
+  catch(e){ torchOn=false; toast('Flashlight not available'); }
+};
+function updStamp(){ const b=$('stampBtn'); b.classList.toggle('on',state.stamp); b.setAttribute('aria-pressed',state.stamp); b.textContent=state.stamp?'DATE STAMP':'NO STAMP'; }
+$('stampBtn').onclick=()=>{ state.stamp=!state.stamp; try{localStorage.setItem('stamp',state.stamp?'1':'0');}catch(e){} updStamp(); toast(state.stamp?'Date and job name will print on photos':'Photos saved without stamp'); };
+
+function drawStamp(ctx,w,h,t){
+  const txt=`${state.job.name}  ·  ${fmtDate(t)} ${fmtTime(t)}`;
+  const fs=Math.round(Math.max(w,h)*0.022);
+  ctx.font=`600 ${fs}px -apple-system, Helvetica, Arial, sans-serif`;
+  const pd=fs*0.5, tw=ctx.measureText(txt).width;
+  const x=fs*0.8, y=h-fs*0.8;
+  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(x-pd, y-fs-pd*0.6, tw+pd*2, fs+pd*1.6);
+  ctx.fillStyle='#f5c518'; ctx.textBaseline='alphabetic'; ctx.fillText(txt, x, y);
+}
+const blobOf=(c,q)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
+async function saveFromCanvas(c){
+  const t=Date.now();
+  if(state.stamp) drawStamp(c.getContext('2d'),c.width,c.height,t);
+  const s=240/Math.min(c.width,c.height);
+  const tc=document.createElement('canvas'); tc.width=Math.round(c.width*s); tc.height=Math.round(c.height*s);
+  tc.getContext('2d').drawImage(c,0,0,tc.width,tc.height);
+  const [blob,thumb]=await Promise.all([blobOf(c,0.92),blobOf(tc,0.75)]);
+  if(!blob){ toast('Photo didn’t save. Try again.'); return; }
+  try{
+    const [buf,thumbBuf]=await Promise.all([bufOf(blob),thumb?bufOf(thumb):null]);
+    await addItem({jobId:state.job.id,type:'photo',mime:'image/jpeg',thumbBuf,taken:t,note:''},buf);
+    state.job.updated=t; putJob(state.job);
+    if(thumb) $('lastThumb').style.backgroundImage=`url(${url(thumb)})`;
+    $('camCount').textContent=Number($('camCount').textContent)+1;
+    runUploads();
+  }catch(e){ toast('Storage is full. Save photos to Drive and delete some.'); }
+}
+$('shutter').onclick=()=>{
+  if(state.mode==='video'){ if(rec) stopRecording(); else startRecording(); return; }
+  const v=$('video'); if(!stream||!v.videoWidth) return;
+  const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  const f=$('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  saveFromCanvas(c);
+};
+document.addEventListener('visibilitychange',async()=>{
+  if(document.hidden){ if(rec){ await stopRecording(); } stopCamera(); }
+  else if(!$('camera').hidden) startCamera();
+});
+
+/* ---------- gallery ---------- */
+async function openGallery(job){
+  state.job=job; freeUrls(); exitSelect();
+  $('galTitle').textContent=job.name;
+  state.photos=(await jobPhotos(job.id)).sort((a,b)=>a.taken-b.taken);
+  renderGallery(); show('gallery');
+}
+function renderGallery(){
+  const g=$('galGrid'); g.textContent='';
+  const ps=state.photos;
+  $('galEmpty').hidden=ps.length>0;
+  $('legend').hidden=!ps.some(p=>p.driveId);
+  updSync();
+  let day='', grid=null;
+  ps.forEach((p,i)=>{
+    const d=fmtDate(p.taken);
+    if(d!==day){ day=d; const l=document.createElement('div'); l.className='daylabel'; l.textContent=d; g.append(l); grid=document.createElement('div'); grid.className='grid'; g.append(grid); }
+    const c=document.createElement('button'); c.className='cell'+(state.picked.has(p.id)?' picked':'');
+    if(p.thumbBuf) c.style.backgroundImage=`url(${thumbUrl(p)})`; c.setAttribute('aria-label','Photo '+fmtTime(p.taken));
+    if(p.driveId) c.insertAdjacentHTML('beforeend','<span class="dot"></span>');
+    if(p.type==='video') c.insertAdjacentHTML('beforeend',`<span class="vbadge"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4l13 8-13 8z"/></svg>${p.duration?fmtDur(p.duration):'VIDEO'}</span>`);
+    if(p.broken) c.insertAdjacentHTML('beforeend','<span class="vbadge" style="background:var(--danger)">CAN’T READ</span>');
+    if(p.note) c.insertAdjacentHTML('beforeend','<span class="note"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg></span>');
+    if(state.selecting) c.insertAdjacentHTML('beforeend','<span class="sel"></span>');
+    c.onclick=()=>{
+      if(state.selecting){ state.picked.has(p.id)?state.picked.delete(p.id):state.picked.add(p.id); c.classList.toggle('picked'); updSel(); }
+      else openViewer(i);
+    };
+    grid.append(c);
+  });
+}
+function updSel(){ const n=state.picked.size; $('selCount').textContent=`${n} selected`; $('selShare').disabled=$('selDelete').disabled=!n; $('selShare').style.opacity=$('selDelete').style.opacity=n?1:.5; }
+function exitSelect(){ state.selecting=false; state.picked.clear(); $('selBar').hidden=true; $('selectBtn').textContent='Select'; }
+$('selectBtn').onclick=()=>{
+  if(state.selecting){ exitSelect(); } else { state.selecting=true; $('selBar').hidden=false; $('selectBtn').textContent='Done'; updSel(); }
+  renderGallery();
+};
+$('galBack').onclick=goJobs;
+$('moreShotsBtn').onclick=()=>openCamera(state.job);
+$('editJobBtn').onclick=()=>openJobSheet(state.job);
+
+async function shareToDrive(list){
+  list=list.filter(p=>p.hasMedia);
+  if(!list.length){ toast('These are only in Google Drive now. Share them from Drive.'); return false; }
+  const files=[];
+  for(const p of list){ const b=await getMedia(p); if(b) files.push(new File([b],fileName(state.job,p),{type:b.type})); }
+  if(!files.length){ toast('Couldn’t read these files.'); return false; }
+  if(!navigator.share||!navigator.canShare||!navigator.canShare({files})){
+    toast('Sharing isn’t available here. Open the app from your Home Screen in Safari.'); return false;
+  }
+  const go=await confirmSheet(`Share ${files.length} file${files.length===1?'':'s'}`,'Pick where to send them: Messages, Mail, Files and more.','Share',true);
+  if(!go) return false;
+  try{
+    await navigator.share({files});
+  }catch(e){
+    if(e&&e.name==='AbortError') return false;
+    toast('Couldn’t open the share sheet. Try fewer photos at a time.'); return false;
+  }
+  return true;
+}
+$('selShare').onclick=async()=>{
+  const list=state.photos.filter(p=>state.picked.has(p.id));
+  if(await shareToDrive(list)){ exitSelect(); renderGallery(); }
+};
+$('selDelete').onclick=async()=>{
+  const list=state.photos.filter(p=>state.picked.has(p.id));
+  const unsaved=list.filter(p=>!p.driveId).length;
+  const ok=await confirmSheet(`Delete ${list.length} photo${list.length===1?'':'s'}?`, unsaved?`${unsaved} of these haven’t uploaded to Drive yet and will be lost.`:'They’ll be removed from this app. The copies in Google Drive stay there.');
+  if(!ok) return;
+  await deletePhotos(list.map(p=>p.id));
+  state.photos=state.photos.filter(p=>!state.picked.has(p.id));
+  exitSelect(); renderGallery(); toast('Deleted');
+};
+
+/* ---------- viewer ---------- */
+let vUrl=null;
+async function openViewer(i){
+  state.viewIdx=i; const p=state.photos[i];
+  if(vUrl){ URL.revokeObjectURL(vUrl); vUrl=null; }
+  const file=await getMedia(p).catch(()=>null);
+  if(state.viewIdx!==i) return;
+  const isVid=p.type==='video'&&file;
+  const show=file||(p.thumbBuf?new Blob([p.thumbBuf],{type:'image/jpeg'}):null);
+  vUrl=show?URL.createObjectURL(show):null;
+  $('vVid').pause(); $('vVid').removeAttribute('src'); $('vVid').hidden=!isVid; $('vImg').hidden=!!isVid;
+  if(isVid) $('vVid').src=vUrl; else if(vUrl) $('vImg').src=vUrl; else $('vImg').removeAttribute('src');
+  $('vTitle').textContent=`${i+1} of ${state.photos.length}`;
+  $('vDate').textContent=`${fmtDate(p.taken)} · ${fmtTime(p.taken)}`;
+  $('vStatus').textContent=p.broken?'This file couldn’t be read':p.driveId?(p.hasMedia?'In Google Drive':'In Google Drive only'):'Waiting to upload';
+  $('vStatus').style.color=p.broken?'var(--danger)':p.driveId?'var(--ok)':'var(--accent)';
+  $('vDrive').hidden=!p.driveId; if(p.driveId) $('vDrive').href=`https://drive.google.com/file/d/${p.driveId}/view`;
+  $('vShare').hidden=!p.hasMedia;
+  $('vNote').value=p.note||'';
+  $('vPrev').hidden=i===0; $('vNext').hidden=i===state.photos.length-1;
+  $('viewer').hidden=false;
+}
+async function saveNote(){
+  const p=state.photos[state.viewIdx]; if(!p) return;
+  const v=$('vNote').value.trim(); if(v===(p.note||'')) return;
+  p.note=v; await putPhoto(p);
+}
+async function closeViewer(){ $('vVid').pause(); await saveNote(); $('viewer').hidden=true; if(vUrl){URL.revokeObjectURL(vUrl);vUrl=null;} renderGallery(); }
+$('vClose').onclick=closeViewer;
+$('vNote').onblur=saveNote;
+$('vPrev').onclick=async()=>{ await saveNote(); openViewer(state.viewIdx-1); };
+$('vNext').onclick=async()=>{ await saveNote(); openViewer(state.viewIdx+1); };
+let tx0=null;
+$('vImg').addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;},{passive:true});
+$('vImg').addEventListener('touchend',async e=>{
+  if(tx0===null) return; const dx=e.changedTouches[0].clientX-tx0; tx0=null;
+  if(Math.abs(dx)<50) return;
+  const n=state.viewIdx+(dx<0?1:-1);
+  if(n>=0&&n<state.photos.length){ await saveNote(); openViewer(n); }
+});
+$('vShare').onclick=async()=>{ const ok=await shareToDrive([state.photos[state.viewIdx]]); await saveNote(); if(ok) openViewer(state.viewIdx); };
+$('vDelete').onclick=async()=>{
+  const p=state.photos[state.viewIdx];
+  const ok=await confirmSheet('Delete this photo?', p.driveId?'It’s removed from this app. The copy in Google Drive stays there.':'It hasn’t uploaded to Drive yet and will be lost.');
+  if(!ok) return;
+  await deletePhotos([p.id]); state.photos.splice(state.viewIdx,1);
+  if(!state.photos.length){ closeViewer(); return; }
+  openViewer(Math.min(state.viewIdx,state.photos.length-1));
+};
+
+/* ---------- Google Drive backup ---------- */
+function folderName(job){
+  if(!job.folder){ job.folder=(job.name+(job.addr?' – '+job.addr:'')).replace(/[\/\\]/g,'-').trim().slice(0,100); putJob(job); }
+  return job.folder;
+}
+function b64(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(blob); });
+}
+async function callDrive(body,timeout=120000){
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),timeout);
+  let r;
+  try{ r=await fetch(cfg.url,{method:'POST',body:JSON.stringify(Object.assign({key:cfg.key},body)),signal:ctrl.signal}); }
+  catch(e){ throw new Error(navigator.onLine?'Couldn’t reach Google. Will retry.':'No signal. Will upload when you’re back online.'); }
+  finally{ clearTimeout(t); }
+  let j; try{ j=JSON.parse(await r.text()); }catch(e){ throw new Error('The Web app link isn’t answering. Check it in Settings.'); }
+  if(!j.ok) throw new Error(j.error==='bad key'?'The key doesn’t match your script. Check Settings.':'Drive said: '+j.error);
+  return j;
+}
+const BIG=6*1024*1024, CHUNK=4*1024*1024;
+// Big files (videos) go up in 4 MB pieces. If the signal drops, the next try continues from the last piece Google confirmed.
+async function uploadBig(p,job,file){
+  const total=file.size, mime=file.type||p.mime||'video/mp4';
+  if(p.up){
+    const st=await callDrive({action:'status',session:p.up.session,total});
+    if(st.id) return st;
+    if(st.expired){ p.up=null; await putPhoto(p); return uploadBig(p,job,file); }
+    p.up.offset=st.next;
+  } else {
+    const r=await callDrive({action:'start',folder:folderName(job),name:fileName(job,p),note:p.note||'',mime,size:total});
+    if(r.id) return r;
+    p.up={session:r.session,offset:0}; await putPhoto(p);
+  }
+  while(true){
+    sync.pct=Math.round(p.up.offset/total*100); updSync();
+    const end=Math.min(p.up.offset+CHUNK,total);
+    const r=await callDrive({action:'chunk',session:p.up.session,start:p.up.offset,total,mime,data:await b64(file.slice(p.up.offset,end))});
+    if(r.id){ sync.pct=null; delete p.up; return r; }
+    p.up.offset=r.next; await putPhoto(p);
+  }
+}
+function pendingList(){
+  return new Promise(res=>{
+    const out=[]; const r=store('photos').openCursor();
+    r.onsuccess=()=>{ const c=r.result; if(!c){ res(out.sort((a,b)=>a.taken-b.taken)); return; } const v=c.value; if(!v.driveId&&v.hasMedia&&!v.broken) out.push(v); c.continue(); };
+    r.onerror=()=>res(out);
+  });
+}
+async function runUploads(){
+  if(sync.busy||!db) return;
+  if(!cfg.url||!cfg.key){ updSync(); return; }
+  sync.busy=true; let did=0;
+  try{
+    const jobs=new Map((await allJobs()).map(j=>[j.id,j]));
+    let list=await pendingList();
+    while(list.length){
+      sync.left=list.length; sync.err=''; updSync();
+      const p=list[0], job=jobs.get(p.jobId);
+      if(job){
+        let file;
+        try{ file=await getMedia(p); }catch(e){ file=null; }
+        if(!file){ p.broken=true; await putPhoto(p); list=await pendingList(); continue; }
+        const res=(p.type==='video'||file.size>BIG)?await uploadBig(p,job,file):await callDrive({action:'upload',folder:folderName(job),name:fileName(job,p),note:p.note||'',data:await b64(file)});
+        p.driveId=res.id; await putPhoto(p); did++;
+        const g=state.photos.find(x=>x.id===p.id); if(g){ g.driveId=res.id; if(!$('gallery').hidden&&$('viewer').hidden) renderGallery(); }
+      }
+      list=await pendingList();
+    }
+    sync.err=''; sync.left=0;
+    await prune();
+  }catch(e){ sync.err=e.message; sync.pct=null; sync.left=(await pendingList()).length; }
+  finally{ sync.busy=false; updSync(); if(did&&!$('jobs').hidden) renderJobs(); }
+}
+async function prune(){
+  if(!cfg.keep) return;
+  const cutoff=Date.now()-cfg.keep*86400000;
+  const all=await rq(store('photos').getAll());
+  for(const p of all){ if(p.driveId&&p.hasMedia&&p.taken<cutoff) await dropMedia(p); }
+}
+async function updSync(){
+  const set=(el,cls,txt,act)=>{ $(el).className='sync '+cls; $(el+'Txt').textContent=txt; $(el+'Act').textContent=act||''; };
+  let cls,txt,act='';
+  if(!cfg.url||!cfg.key){ cls='warn'; txt='Auto backup is off. Photos are only on this phone.'; act='Set up'; }
+  else {
+    const left=sync.busy?sync.left:(db?(await pendingList()).length:0);
+    if(sync.busy&&left){ cls='busy'; txt=`Uploading to Google Drive… ${left} left`+(sync.pct!=null?` (video ${sync.pct}%)`:''); }
+    else if(sync.err&&left){ cls=navigator.onLine?'err':'warn'; txt=`${left} waiting. ${sync.err}`; act='Retry'; }
+    else if(left){ cls='warn'; txt=`${left} waiting to upload`; act='Upload'; }
+    else { cls='ok'; txt='All photos backed up to Google Drive'; }
+  }
+  set('sync',cls,txt,act);
+  if(state.job){
+    const ps=state.photos, inDrive=ps.filter(p=>p.driveId).length;
+    let gt=txt;
+    if(cfg.url&&cfg.key&&ps.length) gt=`${inDrive} of ${ps.length} in Google Drive`+(cls==='busy'?' · uploading…':cls==='err'||cls==='warn'?' · '+txt:'');
+    set('galSync',cls==='ok'&&inDrive<ps.length?'warn':cls,gt,act);
+  }
+}
+function syncTap(){ if(!cfg.url||!cfg.key) openSettings(); else { sync.err=''; runUploads(); } }
+$('sync').onclick=syncTap; $('galSync').onclick=syncTap;
+
+function openSettings(){
+  $('setUrl').value=cfg.url; $('setKey').value=cfg.key; $('setKeep').value=String(cfg.keep);
+  $('setSheet').hidden=false;
+}
+$('setBtn').onclick=openSettings;
+$('setClose').onclick=()=>$('setSheet').hidden=true;
+function readSettings(){ return { url:$('setUrl').value.trim(), key:$('setKey').value.trim(), keep:Number($('setKeep').value) }; }
+$('setTest').onclick=async()=>{
+  const s=readSettings();
+  if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(s.url)){ toast('The link should start with https://script.google.com and end with /exec'); return; }
+  const old={...cfg}; Object.assign(cfg,s);
+  toast('Testing…');
+  try{ await callDrive({action:'ping'},20000); toast('Connected to Google Drive'); }
+  catch(e){ toast(e.message); }
+  finally{ Object.assign(cfg,old); }
+};
+$('setForm').onsubmit=e=>{
+  e.preventDefault();
+  const s=readSettings();
+  if(s.url&&!/^https:\/\/script\.google\.com\/.+\/exec/.test(s.url)){ toast('The link should start with https://script.google.com and end with /exec'); return; }
+  Object.assign(cfg,s);
+  try{ localStorage.setItem('gjp.url',cfg.url); localStorage.setItem('gjp.key',cfg.key); localStorage.setItem('gjp.keep',String(cfg.keep)); }catch(e){}
+  $('setSheet').hidden=true; toast(cfg.url?'Saved. Uploading now.':'Saved');
+  sync.err=''; runUploads();
+};
+window.addEventListener('online',()=>{ sync.err=''; runUploads(); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) runUploads(); });
+setInterval(runUploads,30000);
+
+/* ---------- boot ---------- */
+(async()=>{
+  try{
+    db=await openDB();
+    if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    await migrate().catch(()=>{});
+    await recoverRecordings().catch(()=>{});
+    renderJobs(); runUploads();
+  }catch(e){
+    $('jobsEmpty').hidden=false;
+    $('jobsEmpty').innerHTML='<strong>Storage is blocked</strong><span>Turn off Private Browsing in Safari and open the app again.</span>';
+  }
+  if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+})();
+</script>
+</body>
+</html>
