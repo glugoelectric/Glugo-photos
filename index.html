@@ -198,6 +198,28 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
 .toggle[aria-pressed="true"] i::after{content:"";width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 92px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 @media (prefers-reduced-motion:reduce){.rectimer i{animation:none}.sync.busy i{animation:none}.flash.go{animation:none}.shutter i{transition:none}}
+
+/* Drive browser (iPad / Mac) */
+.drivebtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 14px}
+.drivebtn svg{width:19px;height:19px}
+.dv{z-index:30;background:var(--bg)}
+.dv .bar h1{flex:1;font-size:18px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.djob{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.djob b{display:block;font-size:16px}.djob small{color:var(--muted)}
+.djob .chev{margin-left:auto;color:var(--muted);font-size:22px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.dcell{position:relative;aspect-ratio:1;background:var(--panel2);border-radius:10px;overflow:hidden}
+.dcell img{width:100%;height:100%;object-fit:cover;display:block}
+.dcell .vid{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700;padding:2px 6px;border-radius:6px}
+.dzoom{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#000;touch-action:pan-x pan-y;display:flex}
+.dzoom img{margin:auto;display:block;max-width:none;user-select:none;-webkit-user-select:none}
+.dinfo{padding:10px 16px calc(var(--safe-b) + 12px);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dinfo .meta{flex:1;min-width:180px;color:var(--muted);font-size:14px}
+.dinfo .meta b{color:var(--fg)}
+.dinfo .btn{height:40px;padding:0 14px;display:inline-flex;align-items:center;text-decoration:none}
+.dzbtns{display:flex;gap:6px}
+.dzbtns .btn{width:44px;padding:0;justify-content:center;font-size:20px}
+.dmsg{color:var(--muted);text-align:center;padding:40px 16px}
 </style>
 </head>
 <body>
@@ -210,6 +232,7 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
   </header>
   <div class="scroll">
     <button class="sync" id="sync" type="button"><i></i><span id="syncTxt">Checking backup…</span><b id="syncAct"></b></button>
+    <button class="btn ghost drivebtn" id="driveBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>All jobs in Google Drive</button>
     <div id="joblist" class="joblist"></div>
     <div id="jobsEmpty" class="empty" hidden>
       <strong>No jobs yet</strong>
@@ -398,6 +421,26 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
 <div class="toast" id="toast" hidden></div>
 <canvas id="cv" hidden></canvas>
 
+
+<!-- DRIVE: job folders -->
+<section id="dJobs" class="view dv" hidden>
+  <header class="bar"><button class="iconbtn" id="dJobsBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h1>Google Drive jobs</h1><button class="txtbtn" id="dRefresh" type="button">Refresh</button></header>
+  <div class="scroll"><div id="dJobList"></div></div>
+</section>
+<!-- DRIVE: one job -->
+<section id="dJob" class="view dv" hidden>
+  <header class="bar"><button class="iconbtn" id="dJobBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h1 id="dJobTitle"></h1><a class="btn ghost" style="height:40px;display:inline-flex;align-items:center;text-decoration:none;padding:0 14px" id="dJobOpen" href="#" target="_blank" rel="noopener">Open in Drive</a></header>
+  <div class="scroll"><div id="dGrid" class="dgrid"></div></div>
+</section>
+<!-- DRIVE: one photo, zoomable -->
+<section id="dPhoto" class="view dv" hidden>
+  <header class="bar"><button class="iconbtn" id="dPhotoBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h1 id="dPhotoTitle"></h1>
+    <div class="dzbtns"><button class="btn ghost" id="dPrev" type="button" aria-label="Previous">‹</button><button class="btn ghost" id="dNext" type="button" aria-label="Next">›</button></div></header>
+  <div class="dzoom" id="dZoom"><img id="dImg" alt=""></div>
+  <div class="dinfo"><div class="meta" id="dMeta"></div>
+    <div class="dzbtns"><button class="btn ghost" id="dOut" type="button" aria-label="Zoom out">−</button><button class="btn ghost" id="dFit" type="button" style="width:auto;padding:0 14px;font-size:15px">Fit</button><button class="btn ghost" id="dIn" type="button" aria-label="Zoom in">+</button></div>
+    <a class="btn" id="dOpen" href="#" target="_blank" rel="noopener">Open in Drive</a></div>
+</section>
 <script>
 (() => {
 'use strict';
@@ -1290,6 +1333,110 @@ $('reportShare').onclick=async()=>{
   if(!navigator.canShare||!navigator.canShare({files:[file]})){ toast('Sharing isn’t available here. Use Open in Drive.',4000); return; }
   try{ await navigator.share({files:[file]}); }catch(e){}
 };
+
+
+/* ---------- Drive browser: see every job from any device ---------- */
+const D = { jobs:null, job:null, idx:-1, thumbs:new Map(), q:[], running:0, zoom:1, fitW:0 };
+const dShow = id => { ['dJobs','dJob','dPhoto'].forEach(v=>$(v).hidden = v!==id); };
+const dHide = () => { ['dJobs','dJob','dPhoto'].forEach(v=>$(v).hidden=true); };
+const esc = t => String(t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDay = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+async function dLoad(force){
+  if(!cfg.url||!cfg.key){ $('dJobList').innerHTML='<div class="dmsg">Connect Google Drive first (gear icon), then come back here.</div>'; return; }
+  if(D.jobs&&!force){ dRenderJobs(); return; }
+  $('dJobList').innerHTML='<div class="dmsg">Loading your jobs from Google Drive…</div>';
+  try{ const j=await callDrive({action:'list'},90000); D.jobs=j.jobs||[]; dRenderJobs(); }
+  catch(e){
+    const m=/unknown|not supported|action|answering/i.test(e.message)?'Your Google script needs the update for this (List.gs). Ask Claude for the steps.':e.message;
+    $('dJobList').innerHTML='<div class="dmsg">'+esc(m)+'</div>';
+  }
+}
+function dRenderJobs(){
+  if(!D.jobs.length){ $('dJobList').innerHTML='<div class="dmsg">No job folders in Google Drive yet.</div>'; return; }
+  $('dJobList').innerHTML=D.jobs.map((j,i)=>`<button class="djob" data-i="${i}" type="button"><span><b>${esc(j.name)}</b><small>${j.files.length} item${j.files.length===1?'':'s'} · ${fmtDay(j.updated)}</small></span><span class="chev">›</span></button>`).join('');
+  $('dJobList').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>dOpenJob(D.jobs[+b.dataset.i]));
+}
+function dOpenJob(job){
+  D.job=job; $('dJobTitle').textContent=job.name;
+  $('dJobOpen').href='https://drive.google.com/drive/folders/'+job.id;
+  const g=$('dGrid');
+  g.innerHTML=job.files.length?job.files.map((f,i)=>`<button class="dcell" data-i="${i}" type="button"><img data-id="${f.id}" alt="">${/^video/.test(f.mime)?'<span class="vid">VIDEO</span>':''}</button>`).join(''):'<div class="dmsg">No photos in this job.</div>';
+  g.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>dOpenPhoto(+b.dataset.i));
+  D.q=[...g.querySelectorAll('img[data-id]')]; dPump();
+  dShow('dJob'); $('dJob').querySelector('.scroll').scrollTop=0;
+}
+function dPump(){
+  while(D.running<4&&D.q.length){
+    const img=D.q.shift(), id=img.dataset.id;
+    if(D.thumbs.has(id)){ img.src=D.thumbs.get(id); continue; }
+    D.running++;
+    callDrive({action:'thumb',id},60000).then(r=>{ if(r.data){ const u='data:'+(r.mime||'image/png')+';base64,'+r.data; D.thumbs.set(id,u); img.src=u; } })
+      .catch(()=>{}).finally(()=>{ D.running--; dPump(); });
+  }
+}
+async function dOpenPhoto(i){
+  const job=D.job, f=job.files[i]; if(!f) return;
+  D.idx=i; dShow('dPhoto');
+  $('dPhotoTitle').textContent=job.name+' · '+(i+1)+' of '+job.files.length;
+  $('dOpen').href='https://drive.google.com/file/d/'+f.id+'/view';
+  $('dMeta').innerHTML='<b>'+new Date(f.t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})+'</b>'+(f.note?'<br>'+esc(f.note):'');
+  $('dPrev').disabled=i<=0; $('dNext').disabled=i>=job.files.length-1;
+  $('dPrev').style.opacity=i<=0?.4:1; $('dNext').style.opacity=i>=job.files.length-1?.4:1;
+  const img=$('dImg'); img.removeAttribute('src'); img.style.width='';
+  if(/^video/.test(f.mime)){ $('dMeta').innerHTML+='<br>Videos play in Google Drive — tap Open in Drive.'; if(D.thumbs.has(f.id)) { img.src=D.thumbs.get(f.id); dFitNow(); } return; }
+  if(D.thumbs.has(f.id)){ img.src=D.thumbs.get(f.id); dFitNow(); }
+  try{
+    const r=await callDrive({action:'full',id:f.id},120000);
+    if(D.idx!==i||$('dPhoto').hidden) return;
+    img.onload=()=>dFitNow(); img.src='data:'+r.mime+';base64,'+r.data;
+  }catch(e){ toast('Couldn’t load the full photo: '+e.message,4000); }
+}
+function dFitNow(){
+  const z=$('dZoom'), img=$('dImg');
+  if(!img.naturalWidth){ img.onload=()=>dFitNow(); return; }
+  D.fitW=Math.min(z.clientWidth, z.clientHeight*img.naturalWidth/img.naturalHeight);
+  D.zoom=1; img.style.width=D.fitW+'px';
+}
+function dSetZoom(level,cx,cy){
+  const z=$('dZoom'), img=$('dImg'); if(!D.fitW) return;
+  const max=Math.max(4,(img.naturalWidth/D.fitW)*1.5);
+  level=Math.max(1,Math.min(max,level));
+  const r=z.getBoundingClientRect(); cx=cx==null?r.width/2:cx; cy=cy==null?r.height/2:cy;
+  const fx=(z.scrollLeft+cx)/z.scrollWidth, fy=(z.scrollTop+cy)/z.scrollHeight;
+  D.zoom=level; img.style.width=(D.fitW*level)+'px';
+  z.scrollLeft=fx*z.scrollWidth-cx; z.scrollTop=fy*z.scrollHeight-cy;
+}
+(()=>{
+  const z=$('dZoom'); let pinch=null, lastTap=0;
+  z.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){ const [a,b]=e.touches; pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),z:D.zoom}; }
+    else if(e.touches.length===1){ const now=Date.now(); if(now-lastTap<300){ e.preventDefault(); const r=z.getBoundingClientRect(), t=e.touches[0]; dSetZoom(D.zoom>1.05?1:3,t.clientX-r.left,t.clientY-r.top); } lastTap=now; }
+  },{passive:false});
+  z.addEventListener('touchmove',e=>{
+    if(pinch&&e.touches.length===2){ e.preventDefault(); const [a,b]=e.touches, r=z.getBoundingClientRect();
+      dSetZoom(pinch.z*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d,(a.clientX+b.clientX)/2-r.left,(a.clientY+b.clientY)/2-r.top); }
+  },{passive:false});
+  z.addEventListener('touchend',e=>{ if(e.touches.length<2) pinch=null; });
+  z.addEventListener('dblclick',e=>{ const r=z.getBoundingClientRect(); dSetZoom(D.zoom>1.05?1:3,e.clientX-r.left,e.clientY-r.top); });
+  z.addEventListener('wheel',e=>{ if(!e.ctrlKey&&!e.metaKey) return; e.preventDefault(); const r=z.getBoundingClientRect(); dSetZoom(D.zoom*Math.exp(-e.deltaY/200),e.clientX-r.left,e.clientY-r.top); },{passive:false});
+  ['gesturestart','gesturechange'].forEach(t=>z.addEventListener(t,e=>e.preventDefault()));
+  window.addEventListener('resize',()=>{ if(!$('dPhoto').hidden) dFitNow(); });
+  document.addEventListener('keydown',e=>{
+    if($('dPhoto').hidden) return;
+    if(e.key==='ArrowLeft') $('dPrev').click(); else if(e.key==='ArrowRight') $('dNext').click();
+    else if(e.key==='Escape') $('dPhotoBack').click();
+  });
+})();
+$('driveBtn').onclick=()=>{ dShow('dJobs'); dLoad(false); };
+$('dRefresh').onclick=()=>dLoad(true);
+$('dJobsBack').onclick=dHide;
+$('dJobBack').onclick=()=>{ D.q=[]; dShow('dJobs'); };
+$('dPhotoBack').onclick=()=>dShow('dJob');
+$('dPrev').onclick=()=>{ if(D.idx>0) dOpenPhoto(D.idx-1); };
+$('dNext').onclick=()=>{ if(D.job&&D.idx<D.job.files.length-1) dOpenPhoto(D.idx+1); };
+$('dIn').onclick=()=>dSetZoom(D.zoom*1.6);
+$('dOut').onclick=()=>dSetZoom(D.zoom/1.6);
+$('dFit').onclick=()=>dFitNow();
 
 /* ---------- boot ---------- */
 (async()=>{
