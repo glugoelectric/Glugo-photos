@@ -200,6 +200,8 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
 @media (prefers-reduced-motion:reduce){.rectimer i{animation:none}.sync.busy i{animation:none}.flash.go{animation:none}.shutter i{transition:none}}
 
 /* Drive browser (iPad / Mac) */
+.dhead{display:flex;align-items:center;justify-content:space-between;margin:18px 2px 10px;color:var(--muted);font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.dhead .btn{height:34px;padding:0 14px;font-size:14px;letter-spacing:0;text-transform:none}
 .drivebtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 14px}
 .drivebtn svg{width:19px;height:19px}
 .dv{z-index:30;background:var(--bg)}
@@ -232,8 +234,8 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
   </header>
   <div class="scroll">
     <button class="sync" id="sync" type="button"><i></i><span id="syncTxt">Checking backup…</span><b id="syncAct"></b></button>
-    <button class="btn ghost drivebtn" id="driveBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>All jobs in Google Drive</button>
     <div id="joblist" class="joblist"></div>
+    <div id="driveHome" hidden><div class="dhead"><span>In Google Drive</span><button class="btn ghost" id="dHomeRefresh" type="button">Refresh</button></div><div id="driveHomeList" class="joblist"></div></div>
     <div id="jobsEmpty" class="empty" hidden>
       <strong>No jobs yet</strong>
       <span>Start a job, then every shutter tap saves a photo to it. Nothing goes to your iPhone Photos.</span>
@@ -588,6 +590,7 @@ async function renderJobs(){
     b.onclick=()=>openGallery(j);
     list.append(b);
   }
+  dHome(jobs);
   try{
     if(navigator.storage&&navigator.storage.estimate){
       const e=await navigator.storage.estimate();
@@ -1427,10 +1430,37 @@ function dSetZoom(level,cx,cy){
     else if(e.key==='Escape') $('dPhotoBack').click();
   });
 })();
-$('driveBtn').onclick=()=>{ dShow('dJobs'); dLoad(false); };
+let dHomeBusy=false, dHomeAt=0;
+async function dHome(localJobs){
+  if(!cfg.url||!cfg.key){ $('driveHome').hidden=true; return; }
+  const local=new Set(localJobs.map(j=>(j.folder||'').toLowerCase()).filter(Boolean));
+  const draw=()=>{
+    const extra=(D.jobs||[]).filter(j=>!local.has(j.name.toLowerCase()));
+    $('driveHome').hidden=!extra.length;
+    if(extra.length) $('jobsEmpty').hidden=true;
+    const box=$('driveHomeList'); box.textContent='';
+    for(const j of extra){
+      const b=document.createElement('button'); b.className='job'; b.type='button';
+      const first=j.files.find(f=>/^image/.test(f.mime))||j.files[0];
+      b.innerHTML=`<div class="th"></div><div class="meta"><div class="name">${esc(j.name)}</div><div class="sub">${fmtDay(j.updated)}</div><span class="pill ok">In Drive</span></div><div class="count"><b>${j.files.length}</b>files</div>`;
+      const th=b.querySelector('.th');
+      if(first){ const set=u=>th.style.backgroundImage=`url("${u}")`;
+        if(D.thumbs.has(first.id)) set(D.thumbs.get(first.id));
+        else callDrive({action:'thumb',id:first.id},60000).then(r=>{ if(r.data){ const u='data:'+(r.mime||'image/png')+';base64,'+r.data; D.thumbs.set(first.id,u); set(u); } }).catch(()=>{}); }
+      b.onclick=()=>dOpenJob(j);
+      box.append(b);
+    }
+  };
+  if(D.jobs) draw();
+  if(dHomeBusy||(D.jobs&&Date.now()-dHomeAt<60000)) return;
+  dHomeBusy=true;
+  try{ const r=await callDrive({action:'list'},90000); D.jobs=r.jobs||[]; dHomeAt=Date.now(); draw(); }catch(e){}
+  finally{ dHomeBusy=false; }
+}
+$('dHomeRefresh').onclick=async()=>{ dHomeAt=0; $('dHomeRefresh').textContent='Loading…'; await dHome(await allJobs()); $('dHomeRefresh').textContent='Refresh'; };
 $('dRefresh').onclick=()=>dLoad(true);
 $('dJobsBack').onclick=dHide;
-$('dJobBack').onclick=()=>{ D.q=[]; dShow('dJobs'); };
+$('dJobBack').onclick=()=>{ D.q=[]; dHide(); };
 $('dPhotoBack').onclick=()=>dShow('dJob');
 $('dPrev').onclick=()=>{ if(D.idx>0) dOpenPhoto(D.idx-1); };
 $('dNext').onclick=()=>{ if(D.job&&D.idx<D.job.files.length-1) dOpenPhoto(D.idx+1); };

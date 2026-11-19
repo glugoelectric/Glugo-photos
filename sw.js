@@ -1,5 +1,5 @@
 // Keeps the app working with no signal on the jobsite.
-const CACHE = 'glugo-job-photos-v9';
+const CACHE = 'glugo-job-photos-v10';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 // cache: 'reload' skips the browser's 10-minute copy, so a new version shows up on the first reopen.
 self.addEventListener('install', e => {
